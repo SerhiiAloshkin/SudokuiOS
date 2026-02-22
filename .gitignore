@@ -1,0 +1,7 @@
+/.DS_Store
+/.build
+/.venv
+/SudokuiOS.xcodeproj
+/SudokuiOS.zip
+/__pycache__
+/build
