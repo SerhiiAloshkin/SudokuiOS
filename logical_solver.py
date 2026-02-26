@@ -1,4 +1,5 @@
 import json
+import sys
 
 class HumanLogicSolver:
     def __init__(self, level_data):
@@ -376,10 +377,40 @@ class HumanLogicSolver:
         print("-" * 19)
 
 if __name__ == "__main__":
+    # 1. Check if the user provided an argument in the terminal
+    if len(sys.argv) < 2:
+        print("Usage: python logical_solver.py <level_number>")
+        print("Example: python logical_solver.py 582")
+        sys.exit(1) # Exit with an error code
+        
+    # 2. Try to convert the argument to an integer
     try:
-        with open("/tmp/level_581.json") as f:
-            level_data = json.load(f)
-        solver = HumanLogicSolver(level_data)
-        solver.solve()
+        LEVEL_ID_TO_TEST = int(sys.argv[1])
+    except ValueError:
+        print("Error: The level number must be a valid integer.")
+        sys.exit(1)
+
+    # 3. Path to your master levels file
+    file_path = "SudokuiOS/Levels.json" 
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            all_levels = json.load(f)
+        
+        # Search for the level
+        target_level = None
+        for level in all_levels:
+            if level.get("id") == LEVEL_ID_TO_TEST:
+                target_level = level
+                break
+        
+        # Run the solver if found
+        if target_level:
+            print(f"Testing Level {target_level['id']} (Rules: {target_level.get('ruleType', 'classic')})...")
+            solver = HumanLogicSolver(target_level)
+            solver.solve()
+        else:
+            print(f"Error: Level {LEVEL_ID_TO_TEST} was not found in {file_path}.")
+
     except FileNotFoundError:
-        pass
+        print(f"Error: Could not find the file at {file_path}. Make sure you are in the correct directory.")
