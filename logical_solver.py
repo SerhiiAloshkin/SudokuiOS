@@ -370,7 +370,9 @@ class HumanLogicSolver:
         return changed
 
     def get_sandwich_combinations(self, target):
-        # Implementation of your Swift SandwichMath logic in Python
+        if hasattr(self, 'sandwich_combo_cache') and target in self.sandwich_combo_cache:
+            return self.sandwich_combo_cache[target]
+            
         candidates = [2, 3, 4, 5, 6, 7, 8]
         results = []
         def find_combos(remainder, current, start_idx):
@@ -381,6 +383,10 @@ class HumanLogicSolver:
             for i in range(start_idx, len(candidates)):
                 find_combos(remainder - candidates[i], current + [candidates[i]], i + 1)
         find_combos(target, [], 0)
+        
+        if not hasattr(self, 'sandwich_combo_cache'):
+            self.sandwich_combo_cache = {}
+        self.sandwich_combo_cache[target] = results
         return results
 
     def _apply_sandwich_rules(self):
@@ -394,118 +400,71 @@ class HumanLogicSolver:
             if clue == -1 or clue is None: return False
             internal_changed = False
             
-            # 1. Identify valid (1...9) index pairs for this clue
-            valid_crust_pairs = []
+            all_combos = self.get_sandwich_combinations(clue)
+            
+            unique_pairs = []
+            can_be_1 = [False] * 9
+            can_be_9 = [False] * 9
+            
+            # 1. Identify valid pairs directly
             for i in range(9):
-                for j in range(9):
-                    if i == j: continue
+                for j in range(i + 1, 9):
                     r1, c1 = house_cells[i]
                     r2, c2 = house_cells[j]
                     
-                    # The distance requires `i` to be 1 or 9 and `j` to be the other
-                    # If this is impossible based on current candidates, skip.
-                    can_i_be_1 = 1 in self.candidates[r1][c1]
-                    can_i_be_9 = 9 in self.candidates[r1][c1]
-                    can_j_be_1 = 1 in self.candidates[r2][c2]
-                    can_j_be_9 = 9 in self.candidates[r2][c2]
-                    
-                    if not ((can_i_be_1 and can_j_be_9) or (can_i_be_9 and can_j_be_1)):
+                    dist = j - i - 1
+                    valid_combos = [c for c in all_combos if len(c) == dist]
+                    if not valid_combos:
                         continue
                         
-                    dist = abs(i - j) - 1
-                    if dist < 0:
-                        if clue == 0: valid_crust_pairs.append((i, j, []))
-                        continue
+                    i_1_j_9 = (1 in self.candidates[r1][c1]) and (9 in self.candidates[r2][c2])
+                    i_9_j_1 = (9 in self.candidates[r1][c1]) and (1 in self.candidates[r2][c2])
                     
-                    # Get possible combinations for this distance
-                    combos = self.get_sandwich_combinations(clue)
-                    # Filter combos that fit in the distance
-                    valid_combos = [c for c in combos if len(c) == dist]
-                    if valid_combos:
-                        # Store the combination sets alongside the pair for middle cell pruning
-                        valid_crust_pairs.append((i, j, valid_combos))
+                    if i_1_j_9 or i_9_j_1:
+                        unique_pairs.append((i, j, valid_combos))
+                        if i_1_j_9:
+                            can_be_1[i] = True
+                            can_be_9[j] = True
+                        if i_9_j_1:
+                            can_be_9[i] = True
+                            can_be_1[j] = True
 
-            # 2. If a cell cannot be part of ANY valid 1 or 9 pair, remove 1 and 9
+            # 2. Prune 1 and 9 from impossible cells
             for idx in range(9):
                 r, c = house_cells[idx]
-                can_be_1 = any(p[0] == idx for p in valid_crust_pairs)
-                can_be_9 = any(p[1] == idx for p in valid_crust_pairs)
-                if not can_be_1 and not can_be_9:
+                if not can_be_1[idx]:
                     if self.remove_candidate(r, c, 1): internal_changed = True
+                if not can_be_9[idx]:
                     if self.remove_candidate(r, c, 9): internal_changed = True
 
-            # 3. Forced Sandwich Meat: Combinatorics Pruning
+            if not unique_pairs:
+                return internal_changed
+
+            # 3. Streamlined Combinatorics Pruning
             for idx in range(9):
                 r, c = house_cells[idx]
-                # Skip if it is definitely a crust
                 if len(self.candidates[r][c]) == 1 and list(self.candidates[r][c])[0] in (1, 9):
                     continue
                     
-                # A middle cell must be between at least one valid crust pair
-                # and its candidate must be in at least one of the valid combinations for that pair
                 possible_middle_values = set()
-                is_middle_in_any_pair = False
+                can_be_outside = False
+                can_be_crust = False
                 
-                for crust_pair in valid_crust_pairs:
-                    start_idx = min(crust_pair[0], crust_pair[1])
-                    end_idx = max(crust_pair[0], crust_pair[1])
-                    
+                for start_idx, end_idx, valid_combos in unique_pairs:
                     if start_idx < idx < end_idx:
-                        is_middle_in_any_pair = True
-                        valid_combos = crust_pair[2]
                         for combo in valid_combos:
                             possible_middle_values.update(combo)
+                    else:
+                        if idx < start_idx or idx > end_idx:
+                            can_be_outside = True
+                        if idx == start_idx or idx == end_idx:
+                            can_be_crust = True
                             
-                # If this cell MUST be a middle cell
-                # This happens if it cannot be a crust (1 or 9) AND it cannot be an outside cell
-                # To be an outside cell, there must be a valid crust pair that does NOT enclose this idx.
-                can_be_outside = any(not (min(p[0], p[1]) < idx < max(p[0], p[1])) for p in valid_crust_pairs)
-                can_be_crust = any(p[0] == idx or p[1] == idx for p in valid_crust_pairs)
-                must_be_middle = not can_be_outside and not can_be_crust and valid_crust_pairs
-
+                must_be_middle = not can_be_outside and not can_be_crust
                 if must_be_middle:
-                    # Prune any candidate not in possible_middle_values
                     for v in list(self.candidates[r][c]):
                         if v not in possible_middle_values:
                             if self.remove_candidate(r, c, v): internal_changed = True
-                            
-                # Additionally, for ANY value v in candidates 2-8, 
-                # if it is played here, this cell must either be:
-                # 1) Enclosed by some valid crust pair AND valid in that crust pair's combinations
-                #    OR
-                # 2) Outside some valid crust pair (where it can be anything).
-                if valid_crust_pairs:
-                    is_outside_any_crust = False
-                    # Check if this cell *can* be outside
-                    for crust_pair in valid_crust_pairs:
-                        start_idx = min(crust_pair[0], crust_pair[1])
-                        end_idx = max(crust_pair[0], crust_pair[1])
-                        if not (start_idx < idx < end_idx):
-                            is_outside_any_crust = True
-                            break
-                            
-                    # If it CAN be outside, we can't prune meat candidates based purely on combinatorics
-                    # because they might just be sitting outside safely.
-                    # BUT if it CANNOT be outside (i.e. it is enclosed by ALL valid crust pairs),
-                    # then any candidate MUST be valid in AT LEAST ONE of those enclosing combinations.
-                    must_be_middle = not is_outside_any_crust and not can_be_crust
-                    
-                    if must_be_middle:
-                        for v in list(self.candidates[r][c]):
-                            if v in (1, 9): continue
-                            
-                            is_valid_inside = False
-                            for crust_pair in valid_crust_pairs:
-                                # We already know it's enclosed by this pair due to must_be_middle
-                                valid_combos = crust_pair[2]
-                                for combo in valid_combos:
-                                    if v in combo:
-                                        is_valid_inside = True
-                                        break
-                                if is_valid_inside: break
-                                    
-                            if not is_valid_inside:
-                                if self.remove_candidate(r, c, v): internal_changed = True
 
             return internal_changed
 
