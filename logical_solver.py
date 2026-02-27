@@ -196,22 +196,65 @@ class HumanLogicSolver:
             if not self.candidates[bulb_r][bulb_c]: continue
             if any(not self.candidates[lr][lc] for lr, lc in line): continue
             
-            min_sum = sum(min(self.candidates[lr][lc]) for lr, lc in line)
+            # Prune 1 from bulb
+            if self.remove_candidate(bulb_r, bulb_c, 1): changed = True
+            
+            # Prune 9 from line
+            for lr, lc in line:
+                if self.remove_candidate(lr, lc, 9): changed = True
+            
+            # Uniqueness check: if all line cells are in the same house
+            # they cannot repeat values
+            are_in_same_row = all(lr == line[0][0] for lr, lc in line)
+            are_in_same_col = all(lc == line[0][1] for lr, lc in line)
+            are_in_same_box = all(
+                (lr // 3 == line[0][0] // 3) and (lc // 3 == line[0][1] // 3)
+                for lr, lc in line
+            )
+            strict_uniqueness = are_in_same_row or are_in_same_col or are_in_same_box
+            
+            # Calculate minimum possible sum
+            if strict_uniqueness:
+                # If unique, we take the minimum K distinct candidates from combinations
+                # We can approximate the true minimum by taking the lowest possible unique items
+                # For safety across overlapping sets, we can find the minimum possible subset sum
+                # where each candidate comes from a different set (bipartite matching would be perfect)
+                # We'll use a simpler greedy approach for pruning the bulb:
+                # min_sum is at least sum(range(1, len(line)+1)) if all can be {1..}
+                # To be precise, we collect all possible values:
+                all_line_cands = set()
+                for lr, lc in line:
+                    all_line_cands.update(self.candidates[lr][lc])
+                sorted_cands = sorted(list(all_line_cands))
+                theoretical_min = sum(sorted_cands[:len(line)])
+                theoretical_max = sum(sorted_cands[-len(line):]) if len(sorted_cands) >= len(line) else sum(sorted_cands)
+                min_sum = max(theoretical_min, sum(min(self.candidates[lr][lc]) for lr, lc in line))
+                max_sum = min(theoretical_max, sum(max(self.candidates[lr][lc]) for lr, lc in line))
+            else:
+                min_sum = sum(min(self.candidates[lr][lc]) for lr, lc in line)
+                max_sum = sum(max(self.candidates[lr][lc]) for lr, lc in line)
+                
             for v in list(self.candidates[bulb_r][bulb_c]):
-                if v < min_sum:
-                    if self.remove_candidate(bulb_r, bulb_c, v): changed = True
-                    
-            max_sum = sum(max(self.candidates[lr][lc]) for lr, lc in line)
-            for v in list(self.candidates[bulb_r][bulb_c]):
-                if v > max_sum:
+                if v < min_sum or v > max_sum:
                     if self.remove_candidate(bulb_r, bulb_c, v): changed = True
                     
             if not self.candidates[bulb_r][bulb_c]: continue
             max_bulb = max(self.candidates[bulb_r][bulb_c])
+            
+            # Evaluate max push to lines
             for i, (lr, lc) in enumerate(line):
-                other_min_sum = sum(min(self.candidates[or_r][or_c]) for j, (or_r, or_c) in enumerate(line) if i != j)
+                if strict_uniqueness:
+                    other_cands = set()
+                    for j, (or_r, or_c) in enumerate(line):
+                        if i != j:
+                            other_cands.update(self.candidates[or_r][or_c])
+                    sorted_others = sorted(list(other_cands))
+                    other_min = sum(sorted_others[:len(line)-1])
+                else:
+                    other_min = sum(min(self.candidates[or_r][or_c]) for j, (or_r, or_c) in enumerate(line) if i != j)
+                
                 for v in list(self.candidates[lr][lc]):
-                    if v + other_min_sum > max_bulb:
+                    if v + other_min > max_bulb:
                         if self.remove_candidate(lr, lc, v): changed = True
         return changed
 
@@ -344,6 +387,8 @@ class HumanLogicSolver:
         changed = False
         row_clues = self.level_data.get("sandwich_clues", {}).get("row_sums", [])
         col_clues = self.level_data.get("sandwich_clues", {}).get("col_sums", [])
+        if not row_clues or not col_clues:
+            return False
 
         def process_sandwich(house_cells, clue):
             if clue == -1 or clue is None: return False
@@ -354,9 +399,22 @@ class HumanLogicSolver:
             for i in range(9):
                 for j in range(9):
                     if i == j: continue
+                    r1, c1 = house_cells[i]
+                    r2, c2 = house_cells[j]
+                    
+                    # The distance requires `i` to be 1 or 9 and `j` to be the other
+                    # If this is impossible based on current candidates, skip.
+                    can_i_be_1 = 1 in self.candidates[r1][c1]
+                    can_i_be_9 = 9 in self.candidates[r1][c1]
+                    can_j_be_1 = 1 in self.candidates[r2][c2]
+                    can_j_be_9 = 9 in self.candidates[r2][c2]
+                    
+                    if not ((can_i_be_1 and can_j_be_9) or (can_i_be_9 and can_j_be_1)):
+                        continue
+                        
                     dist = abs(i - j) - 1
                     if dist < 0:
-                        if clue == 0: valid_crust_pairs.append((i, j))
+                        if clue == 0: valid_crust_pairs.append((i, j, []))
                         continue
                     
                     # Get possible combinations for this distance
@@ -364,7 +422,8 @@ class HumanLogicSolver:
                     # Filter combos that fit in the distance
                     valid_combos = [c for c in combos if len(c) == dist]
                     if valid_combos:
-                        valid_crust_pairs.append((i, j))
+                        # Store the combination sets alongside the pair for middle cell pruning
+                        valid_crust_pairs.append((i, j, valid_combos))
 
             # 2. If a cell cannot be part of ANY valid 1 or 9 pair, remove 1 and 9
             for idx in range(9):
@@ -375,8 +434,79 @@ class HumanLogicSolver:
                     if self.remove_candidate(r, c, 1): internal_changed = True
                     if self.remove_candidate(r, c, 9): internal_changed = True
 
-            # 3. Forced Sandwich Meat: If a cell is between 1 and 9 in EVERY valid pair,
-            # it cannot contain 1 or 9.
+            # 3. Forced Sandwich Meat: Combinatorics Pruning
+            for idx in range(9):
+                r, c = house_cells[idx]
+                # Skip if it is definitely a crust
+                if len(self.candidates[r][c]) == 1 and list(self.candidates[r][c])[0] in (1, 9):
+                    continue
+                    
+                # A middle cell must be between at least one valid crust pair
+                # and its candidate must be in at least one of the valid combinations for that pair
+                possible_middle_values = set()
+                is_middle_in_any_pair = False
+                
+                for crust_pair in valid_crust_pairs:
+                    start_idx = min(crust_pair[0], crust_pair[1])
+                    end_idx = max(crust_pair[0], crust_pair[1])
+                    
+                    if start_idx < idx < end_idx:
+                        is_middle_in_any_pair = True
+                        valid_combos = crust_pair[2]
+                        for combo in valid_combos:
+                            possible_middle_values.update(combo)
+                            
+                # If this cell MUST be a middle cell
+                # This happens if it cannot be a crust (1 or 9) AND it cannot be an outside cell
+                # To be an outside cell, there must be a valid crust pair that does NOT enclose this idx.
+                can_be_outside = any(not (min(p[0], p[1]) < idx < max(p[0], p[1])) for p in valid_crust_pairs)
+                can_be_crust = any(p[0] == idx or p[1] == idx for p in valid_crust_pairs)
+                must_be_middle = not can_be_outside and not can_be_crust and valid_crust_pairs
+
+                if must_be_middle:
+                    # Prune any candidate not in possible_middle_values
+                    for v in list(self.candidates[r][c]):
+                        if v not in possible_middle_values:
+                            if self.remove_candidate(r, c, v): internal_changed = True
+                            
+                # Additionally, for ANY value v in candidates 2-8, 
+                # if it is played here, this cell must either be:
+                # 1) Enclosed by some valid crust pair AND valid in that crust pair's combinations
+                #    OR
+                # 2) Outside some valid crust pair (where it can be anything).
+                if valid_crust_pairs:
+                    is_outside_any_crust = False
+                    # Check if this cell *can* be outside
+                    for crust_pair in valid_crust_pairs:
+                        start_idx = min(crust_pair[0], crust_pair[1])
+                        end_idx = max(crust_pair[0], crust_pair[1])
+                        if not (start_idx < idx < end_idx):
+                            is_outside_any_crust = True
+                            break
+                            
+                    # If it CAN be outside, we can't prune meat candidates based purely on combinatorics
+                    # because they might just be sitting outside safely.
+                    # BUT if it CANNOT be outside (i.e. it is enclosed by ALL valid crust pairs),
+                    # then any candidate MUST be valid in AT LEAST ONE of those enclosing combinations.
+                    must_be_middle = not is_outside_any_crust and not can_be_crust
+                    
+                    if must_be_middle:
+                        for v in list(self.candidates[r][c]):
+                            if v in (1, 9): continue
+                            
+                            is_valid_inside = False
+                            for crust_pair in valid_crust_pairs:
+                                # We already know it's enclosed by this pair due to must_be_middle
+                                valid_combos = crust_pair[2]
+                                for combo in valid_combos:
+                                    if v in combo:
+                                        is_valid_inside = True
+                                        break
+                                if is_valid_inside: break
+                                    
+                            if not is_valid_inside:
+                                if self.remove_candidate(r, c, v): internal_changed = True
+
             return internal_changed
 
         # Apply to rows and columns
