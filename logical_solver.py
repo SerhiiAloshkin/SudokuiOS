@@ -57,6 +57,8 @@ class HumanLogicSolver:
 
     def _apply_classic_rules(self):
         changed = False
+        
+        # 1. Naked Singles
         for r in range(9):
             for c in range(9):
                 if len(self.candidates[r][c]) == 1:
@@ -66,6 +68,7 @@ class HumanLogicSolver:
                             if (hr, hc) != (r, c):
                                 if self.remove_candidate(hr, hc, val): changed = True
 
+        # 2. Hidden Singles
         for r in range(9):
             for c in range(9):
                 if len(self.candidates[r][c]) > 1:
@@ -80,6 +83,42 @@ class HumanLogicSolver:
                                     found_hidden = True
                                 break
                         if found_hidden: break
+
+        # 3. Naked Pairs
+        for r in range(9):
+            for c in range(9):
+                if len(self.candidates[r][c]) == 2:
+                    pair = self.candidates[r][c]
+                    for house in self.get_houses(r, c):
+                        # Find other cells in the same house with the EXACT same pair
+                        match_cells = [(hr, hc) for hr, hc in house if self.candidates[hr][hc] == pair]
+                        if len(match_cells) == 2:
+                            # Remove these two values from all OTHER cells in the house
+                            for hr, hc in house:
+                                if (hr, hc) not in match_cells:
+                                    for val in pair:
+                                        if self.remove_candidate(hr, hc, val): changed = True
+
+        # 4. Pointing Pairs / Box-Line Reduction
+        for br in range(3):
+            for bc in range(3):
+                box_cells = [(br * 3 + i // 3, bc * 3 + i % 3) for i in range(9)]
+                for val in range(1, 10):
+                    cells_with_val = [(r, c) for r, c in box_cells if val in self.candidates[r][c]]
+                    if len(cells_with_val) >= 2:
+                        # Check if they share a row
+                        if all(r == cells_with_val[0][0] for r, c in cells_with_val):
+                            row = cells_with_val[0][0]
+                            for c in range(9):
+                                if (row, c) not in box_cells:
+                                    if self.remove_candidate(row, c, val): changed = True
+                        # Check if they share a column
+                        if all(c == cells_with_val[0][1] for r, c in cells_with_val):
+                            col = cells_with_val[0][1]
+                            for r in range(9):
+                                if (r, col) not in box_cells:
+                                    if self.remove_candidate(r, col, val): changed = True
+
         return changed
 
     def _apply_knight_rules(self):
