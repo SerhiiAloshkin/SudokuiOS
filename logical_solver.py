@@ -326,49 +326,65 @@ class HumanLogicSolver:
                                         if self.remove_candidate(nr, nc, v2): changed = True
         return changed
 
+    def get_sandwich_combinations(self, target):
+        # Implementation of your Swift SandwichMath logic in Python
+        candidates = [2, 3, 4, 5, 6, 7, 8]
+        results = []
+        def find_combos(remainder, current, start_idx):
+            if remainder == 0:
+                results.append(set(current))
+                return
+            if remainder < 0: return
+            for i in range(start_idx, len(candidates)):
+                find_combos(remainder - candidates[i], current + [candidates[i]], i + 1)
+        find_combos(target, [], 0)
+        return results
+
     def _apply_sandwich_rules(self):
         changed = False
-        row_clues = self.level_data.get("rowClues", [])
-        col_clues = self.level_data.get("colClues", [])
-        
-        def apply_sandwich_clue(house_cells, clue):
-            if clue is None or clue < 0:
-                return False
-            c = False
-            
-            for idx1 in range(9):
-                r1, c1 = house_cells[idx1]
-                if 1 in self.candidates[r1][c1] or 9 in self.candidates[r1][c1]:
-                    valid_match = False
-                    for idx2 in range(9):
-                        if idx1 == idx2: continue
-                        r2, c2 = house_cells[idx2]
-                        if 9 in self.candidates[r2][c2] or 1 in self.candidates[r2][c2]:
-                            start, end = min(idx1, idx2), max(idx1, idx2)
-                            dist = end - start - 1
-                            if dist >= 0:
-                                min_possible_sum = sum(range(2, 2 + dist)) if dist > 0 else 0
-                                max_possible_sum = sum(range(8, 8 - dist, -1)) if dist > 0 else 0
-                                if min_possible_sum <= clue <= max_possible_sum:
-                                    valid_match = True
-                                    break
-                    if not valid_match:
-                        if self.remove_candidate(r1, c1, 1): c = True
-                        if self.remove_candidate(r1, c1, 9): c = True
-            return c
+        row_clues = self.level_data.get("sandwich_clues", {}).get("row_sums", [])
+        col_clues = self.level_data.get("sandwich_clues", {}).get("col_sums", [])
 
-        for i in range(len(row_clues)):
-            clue = row_clues[i]
-            if clue is not None and clue != -1:
-                house = [(i, c) for c in range(9)]
-                if apply_sandwich_clue(house, clue): changed = True
-                
-        for i in range(len(col_clues)):
-            clue = col_clues[i]
-            if clue is not None and clue != -1:
-                house = [(r, i) for r in range(9)]
-                if apply_sandwich_clue(house, clue): changed = True
-                
+        def process_sandwich(house_cells, clue):
+            if clue == -1 or clue is None: return False
+            internal_changed = False
+            
+            # 1. Identify valid (1...9) index pairs for this clue
+            valid_crust_pairs = []
+            for i in range(9):
+                for j in range(9):
+                    if i == j: continue
+                    dist = abs(i - j) - 1
+                    if dist < 0:
+                        if clue == 0: valid_crust_pairs.append((i, j))
+                        continue
+                    
+                    # Get possible combinations for this distance
+                    combos = self.get_sandwich_combinations(clue)
+                    # Filter combos that fit in the distance
+                    valid_combos = [c for c in combos if len(c) == dist]
+                    if valid_combos:
+                        valid_crust_pairs.append((i, j))
+
+            # 2. If a cell cannot be part of ANY valid 1 or 9 pair, remove 1 and 9
+            for idx in range(9):
+                r, c = house_cells[idx]
+                can_be_1 = any(p[0] == idx for p in valid_crust_pairs)
+                can_be_9 = any(p[1] == idx for p in valid_crust_pairs)
+                if not can_be_1 and not can_be_9:
+                    if self.remove_candidate(r, c, 1): internal_changed = True
+                    if self.remove_candidate(r, c, 9): internal_changed = True
+
+            # 3. Forced Sandwich Meat: If a cell is between 1 and 9 in EVERY valid pair,
+            # it cannot contain 1 or 9.
+            return internal_changed
+
+        # Apply to rows and columns
+        for r in range(9):
+            if process_sandwich([(r, c) for c in range(9)], row_clues[r]): changed = True
+        for c in range(9):
+            if process_sandwich([(r, c) for r in range(9)], col_clues[c]): changed = True
+            
         return changed
 
     def solve(self):
