@@ -179,23 +179,49 @@ class HumanLogicSolver:
                         if self.remove_candidate(nr, nc, val): changed = True
         return changed
 
-    def _apply_non_consecutive_rules(self):
-        changed = False
+    def _apply_non_consecutive_implications(self):
         if "non-consecutive" not in self.rules and "non-consecutive" not in self.constraints:
             return False
+            
+        changed = False
+        
+        # 1. Passive Check: Prune adjacent to fully SOLVED cells
         for r in range(9):
             for c in range(9):
                 if len(self.candidates[r][c]) == 1:
                     val = list(self.candidates[r][c])[0]
                     for nr, nc in self.get_neighbors(r, c):
-                        if self.remove_candidate(nr, nc, val - 1): changed = True
-                        if self.remove_candidate(nr, nc, val + 1): changed = True
-                else:
-                    for nr, nc in self.get_neighbors(r, c):
-                        neighbor_cands = self.candidates[nr][nc]
-                        for v in list(self.candidates[r][c]):
-                            if not any(abs(v - nv) != 1 for nv in neighbor_cands):
-                                if self.remove_candidate(r, c, v): changed = True
+                        if val - 1 in self.candidates[nr][nc]:
+                            if self.remove_candidate(nr, nc, val - 1): changed = True
+                        if val + 1 in self.candidates[nr][nc]:
+                            if self.remove_candidate(nr, nc, val + 1): changed = True
+                            
+        # 2. Active Implication Check (Look-ahead)
+        for r in range(9):
+            for c in range(9):
+                if len(self.candidates[r][c]) > 1:
+                    for v in list(self.candidates[r][c]):
+                        neighbors = self.get_neighbors(r, c)
+                        is_valid = True
+                        
+                        for house in self.get_houses(r, c):
+                            # Check if placing 'v' destroys all spots for 'v+1'
+                            if v < 9:
+                                spots_for_next = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v+1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
+                                if spots_for_next == 0:
+                                    is_valid = False
+                                    break
+                                    
+                            # Check if placing 'v' destroys all spots for 'v-1'
+                            if v > 1:
+                                spots_for_prev = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v-1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
+                                if spots_for_prev == 0:
+                                    is_valid = False
+                                    break
+                                    
+                        if not is_valid:
+                            if self.remove_candidate(r, c, v): changed = True
+                            
         return changed
 
     def _apply_thermo_rules(self):
@@ -238,6 +264,15 @@ class HumanLogicSolver:
                 if current_sum > max_bulb: return False
                 if idx == len(line):
                     if current_sum in self.candidates[bulb_r][bulb_c]:
+                        if "non-consecutive" in self.rules or "non-consecutive" in self.constraints:
+                            collision = False
+                            for p_idx in range(len(line)):
+                                pr, pc = line[p_idx]
+                                if abs(pr - bulb_r) + abs(pc - bulb_c) == 1:
+                                    if abs(line_vals[p_idx] - current_sum) == 1:
+                                        collision = True
+                                        break
+                            if collision: return False
                         valid_bulb.add(current_sum)
                         return True
                     return False
@@ -253,6 +288,15 @@ class HumanLogicSolver:
                             if pr == lr or pc == lc or (pr//3 == lr//3 and pc//3 == lc//3):
                                 collision = True
                                 break
+                    if collision: continue
+                    
+                    if "non-consecutive" in self.rules or "non-consecutive" in self.constraints:
+                        for p_idx in range(idx):
+                            pr, pc = line[p_idx]
+                            if abs(pr - lr) + abs(pc - lc) == 1:
+                                if abs(line_vals[p_idx] - v) == 1:
+                                    collision = True
+                                    break
                     if collision: continue
                     
                     line_vals[idx] = v
@@ -274,30 +318,120 @@ class HumanLogicSolver:
     def _apply_killer_rules(self):
         changed = False
         cages = self.level_data.get("cages", [])
+        if not cages: return False
+        nc_active = "non-consecutive" in self.rules or "non-consecutive" in self.constraints
+        # 1. Strict DFS for each cage (Standard Combinatorics + Non-Consecutive)
         for cage in cages:
-            target = cage.get("sum", 0)
-            cells = cage.get("cells", [])
-            if not target or not cells: continue
-            if any(not self.candidates[r][c] for r, c in cells): continue
+            target = cage["sum"]
+            cells = [tuple(c) for c in cage["cells"]]
+            valid_assignments = [set() for _ in cells]
             
-            for i, (cr, cc) in enumerate(cells):
-                other_min_sum = sum(min(self.candidates[or_r][or_c]) for j, (or_r, or_c) in enumerate(cells) if i != j)
-                for v in list(self.candidates[cr][cc]):
-                    if v + other_min_sum > target:
-                        if self.remove_candidate(cr, cc, v): changed = True
+            def dfs(idx, current_sum, assigned_vals):
+                if current_sum > target: return False
+                if idx == len(cells):
+                    if current_sum == target:
+                        for k, val in enumerate(assigned_vals):
+                            valid_assignments[k].add(val)
+                        return True
+                    return False
+                
+                r, c = cells[idx]
+                found = False
+                for v in self.candidates[r][c]:
+                    if v in assigned_vals: continue 
+                    
+                    collision = False
+                    if nc_active:
+                        for p_idx in range(idx):
+                            pr, pc = cells[p_idx]
+                            if abs(pr - r) + abs(pc - c) == 1:
+                                if abs(assigned_vals[p_idx] - v) == 1:
+                                    collision = True
+                                    break
+                    if collision: continue
+                    
+                    assigned_vals.append(v)
+                    if dfs(idx + 1, current_sum + v, assigned_vals):
+                        found = True
+                    assigned_vals.pop()
+                return found
+            dfs(0, 0, [])
+            
+            for k, (r, c) in enumerate(cells):
+                for v in list(self.candidates[r][c]):
+                    if v not in valid_assignments[k]:
+                        if self.remove_candidate(r, c, v): changed = True
+        # 2. Rule of 45 (Innies / Remaining Cells inside a House)
+        houses = []
+        for i in range(9):
+            houses.append([(i, c) for c in range(9)])
+            houses.append([(r, i) for r in range(9)])
+            br, bc = (i // 3) * 3, (i % 3) * 3
+            houses.append([(br + r, bc + c) for r in range(3) for c in range(3)])
+            
+        for house in houses:
+            contained_cages = []
+            for cage in cages:
+                cage_cells = [tuple(c) for c in cage["cells"]]
+                if all(cell in house for cell in cage_cells):
+                    contained_cages.append(cage)
+                    
+            contained_cage_cells = set()
+            for c in contained_cages:
+                contained_cage_cells.update([tuple(x) for x in c["cells"]])
+                
+            solved_sum = 0
+            solved_cells = set()
+            for r, c in house:
+                if (r, c) not in contained_cage_cells and len(self.candidates[r][c]) == 1:
+                    solved_sum += list(self.candidates[r][c])[0]
+                    solved_cells.add((r, c))
+                    
+            remaining_cells = [cell for cell in house if cell not in contained_cage_cells and cell not in solved_cells]
+            
+            if 1 <= len(remaining_cells) <= 4:
+                target_sum = 45 - sum(c["sum"] for c in contained_cages) - solved_sum
+                if target_sum <= 0: continue
+                
+                valid_rem_assignments = [set() for _ in remaining_cells]
+                
+                def dfs_rem(idx, current_sum, assigned_vals):
+                    if current_sum > target_sum: return False
+                    if idx == len(remaining_cells):
+                        if current_sum == target_sum:
+                            for k, val in enumerate(assigned_vals):
+                                valid_rem_assignments[k].add(val)
+                            return True
+                        return False
+                    
+                    r, c = remaining_cells[idx]
+                    found = False
+                    for v in self.candidates[r][c]:
+                        if v in assigned_vals: continue
                         
-            for i, (cr, cc) in enumerate(cells):
-                other_max_sum = sum(max(self.candidates[or_r][or_c]) for j, (or_r, or_c) in enumerate(cells) if i != j)
-                for v in list(self.candidates[cr][cc]):
-                    if v + other_max_sum < target:
-                        if self.remove_candidate(cr, cc, v): changed = True
+                        collision = False
+                        if nc_active:
+                            for p_idx in range(idx):
+                                pr, pc = remaining_cells[p_idx]
+                                if abs(pr - r) + abs(pc - c) == 1:
+                                    if abs(assigned_vals[p_idx] - v) == 1:
+                                        collision = True
+                                        break
+                        if collision: continue
                         
-            for i, (cr, cc) in enumerate(cells):
-                if len(self.candidates[cr][cc]) == 1:
-                    val = list(self.candidates[cr][cc])[0]
-                    for j, (or_r, or_c) in enumerate(cells):
-                        if i != j:
-                            if self.remove_candidate(or_r, or_c, val): changed = True
+                        assigned_vals.append(v)
+                        if dfs_rem(idx + 1, current_sum + v, assigned_vals):
+                            found = True
+                        assigned_vals.pop()
+                    return found
+                    
+                dfs_rem(0, 0, [])
+                
+                for k, (r, c) in enumerate(remaining_cells):
+                    for v in list(self.candidates[r][c]):
+                        if v not in valid_rem_assignments[k]:
+                            if self.remove_candidate(r, c, v): changed = True
+        
         return changed
 
     def _apply_odd_even_rules(self):
@@ -421,48 +555,100 @@ class HumanLogicSolver:
                 for j in range(i + 1, 9):
                     r1, c1 = house_cells[i]
                     r2, c2 = house_cells[j]
-                    dist = j - i - 1
                     
-                    v_combos = [c for c in all_combos if len(c) == dist]
-                    v_out = [c for c in outside_combos if len(c) == 7 - dist]
-                    
-                    if not v_combos or not v_out: continue
-                        
                     i_1 = 1 in self.candidates[r1][c1]
                     i_9 = 9 in self.candidates[r1][c1]
                     j_1 = 1 in self.candidates[r2][c2]
                     j_9 = 9 in self.candidates[r2][c2]
                     
-                    if (i_1 and j_9) or (i_9 and j_1):
-                        valid_scenarios.append((i, j, v_combos, v_out))
+                    if not ((i_1 and j_9) or (i_9 and j_1)): continue
+                    
+                    middle_cells = [house_cells[k] for k in range(i+1, j)]
+                    outside_cells = [house_cells[k] for k in range(9) if k < i or k > j]
+                    
+                    def get_valid_assignments(combos, cells, crusts):
+                        if not cells: return True, []
+                        valid_assignments = [set() for _ in cells]
+                        any_valid = False
+                        
+                        for combo in combos:
+                            if len(combo) != len(cells): continue
+                            combo_list = list(combo)
+                            
+                            def search(idx, assigned_vals):
+                                nonlocal any_valid
+                                if idx == len(cells):
+                                    any_valid = True
+                                    for k, val in enumerate(assigned_vals):
+                                        valid_assignments[k].add(val)
+                                    return True
+                                
+                                r, c = cells[idx]
+                                found = False
+                                for v in combo_list:
+                                    if v in assigned_vals: continue
+                                    if v not in self.candidates[r][c]: continue
+                                    
+                                    if "non-consecutive" in self.rules or "non-consecutive" in self.constraints:
+                                        collision = False
+                                        for cr_r, cr_c, cr_v in crusts:
+                                            if abs(cr_r - r) + abs(cr_c - c) == 1:
+                                                if abs(cr_v - v) == 1:
+                                                    collision = True
+                                                    break
+                                        if collision: continue
+                                        
+                                        for p_idx in range(idx):
+                                            pr, pc = cells[p_idx]
+                                            if abs(pr - r) + abs(pc - c) == 1:
+                                                if abs(assigned_vals[p_idx] - v) == 1:
+                                                    collision = True
+                                                    break
+                                        if collision: continue
+                                        
+                                    assigned_vals.append(v)
+                                    if search(idx + 1, assigned_vals):
+                                        found = True
+                                    assigned_vals.pop()
+                                return found
+                            search(0, [])
+                        return any_valid, valid_assignments
+                        
+                    def check_scenario(crusts):
+                        mid_ok, mid_assigns = get_valid_assignments(all_combos, middle_cells, crusts)
+                        if not mid_ok: return None
+                        out_ok, out_assigns = get_valid_assignments(outside_combos, outside_cells, crusts)
+                        if not out_ok: return None
+                        return mid_assigns, out_assigns
+                        
+                    if i_1 and j_9:
+                        res = check_scenario([(r1, c1, 1), (r2, c2, 9)])
+                        if res: valid_scenarios.append((i, j, 1, 9, res[0], res[1]))
+                    if i_9 and j_1:
+                        res = check_scenario([(r1, c1, 9), (r2, c2, 1)])
+                        if res: valid_scenarios.append((i, j, 9, 1, res[0], res[1]))
+                        
             if not valid_scenarios: return False
+            
             for idx in range(9):
                 r, c = house_cells[idx]
                 allowed_values = set()
                 
-                for start_idx, end_idx, v_combos, v_out_combos in valid_scenarios:
-                    r1, c1 = house_cells[start_idx]
-                    r2, c2 = house_cells[end_idx]
-                    i_1 = 1 in self.candidates[r1][c1]
-                    i_9 = 9 in self.candidates[r1][c1]
-                    j_1 = 1 in self.candidates[r2][c2]
-                    j_9 = 9 in self.candidates[r2][c2]
-                    
-                    if idx == start_idx:
-                        if i_1 and j_9: allowed_values.add(1)
-                        if i_9 and j_1: allowed_values.add(9)
-                    elif idx == end_idx:
-                        if i_1 and j_9: allowed_values.add(9)
-                        if i_9 and j_1: allowed_values.add(1)
+                for start_idx, end_idx, val_start, val_end, mid_assigns, out_assigns in valid_scenarios:
+                    if idx == start_idx: allowed_values.add(val_start)
+                    elif idx == end_idx: allowed_values.add(val_end)
                     elif start_idx < idx < end_idx:
-                        for combo in v_combos: allowed_values.update(combo)
+                        mid_k = idx - start_idx - 1
+                        allowed_values.update(mid_assigns[mid_k])
                     else:
-                        for combo in v_out_combos: allowed_values.update(combo)
+                        out_k = idx if idx < start_idx else idx - (end_idx - start_idx + 1)
+                        allowed_values.update(out_assigns[out_k])
                             
                 for v in list(self.candidates[r][c]):
                     if v not in allowed_values:
                         if self.remove_candidate(r, c, v): internal_changed = True
             return internal_changed
+            
         for r in range(9):
             if process_sandwich([(r, c) for c in range(9)], row_clues[r]): changed = True
         for c in range(9):
@@ -477,10 +663,11 @@ class HumanLogicSolver:
             if self._apply_classic_rules(): changed = True
             if self._apply_knight_rules(): changed = True
             if self._apply_king_rules(): changed = True
-            if self._apply_non_consecutive_rules(): changed = True
+            if self._apply_non_consecutive_implications(): changed = True
             if self._apply_thermo_rules(): changed = True
             if self._apply_arrow_rules(): changed = True
-            if self._apply_killer_rules(): changed = True
+            if "killer" in self.rules:
+                if self._apply_killer_rules(): changed = True
             if self._apply_odd_even_rules(): changed = True
             if self._apply_kropki_rules(): changed = True
             if self._apply_sandwich_rules(): changed = True
