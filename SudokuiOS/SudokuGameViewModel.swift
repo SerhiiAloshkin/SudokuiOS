@@ -227,18 +227,12 @@ class SudokuGameViewModel: ObservableObject {
         self.parityOverlay = level.parity
         self.isSolved = level.isSolved
         
-        // Enforce Classic Rule for 1, 11, 21... (Legacy Logic)
-        if (levelID - 1) % 10 == 0 {
-            self.ruleType = .classic
-            self.rules = [.classic]
+        self.ruleType = level.ruleType
+        // Hybrid Support: Use 'types' if available, otherwise fallback to single 'ruleType'
+        if !level.types.isEmpty {
+            self.rules = level.types
         } else {
-            self.ruleType = level.ruleType
-            // Hybrid Support: Use 'types' if available, otherwise fallback to single 'ruleType'
-            if !level.types.isEmpty {
-                self.rules = level.types
-            } else {
-                self.rules = [level.ruleType]
-            }
+            self.rules = [level.ruleType]
         }
         
         // 2. Set Current State (User Progress > Static Board)
@@ -1056,8 +1050,7 @@ class SudokuGameViewModel: ObservableObject {
     }
     
     var isNonConsecutive: Bool {
-        // Level 2, 12, 22...
-        return (levelID - 2) % 10 == 0
+        return rules.contains(.nonConsecutive)
     }
     
     func hasConsecutiveNeighbor(at index: Int, value: Int) -> Bool {
@@ -1706,9 +1699,6 @@ class SudokuGameViewModel: ObservableObject {
     }
     
     func getRawRuleType() -> String {
-         if (levelID - 1) % 10 == 0 {
-             return "classic"
-         }
          if let level = parentViewModel.levels.first(where: { $0.id == levelID }) {
              return level.ruleType.rawValue
          }
@@ -1716,20 +1706,13 @@ class SudokuGameViewModel: ObservableObject {
     }
 
     var gameTypeInfo: (text: String, icon: String, rule: String) {
-        // Logic: (levelID - 1) % 10 == 0 -> Classic
-        if (levelID - 1) % 10 == 0 {
-            return ("Classic Sudoku", SudokuRuleType.classic.iconName, "Classic")
-        } else {
-             // Get ruleType from level (from parent VM is safest source of truth for metadata)
-             if let level = parentViewModel.levels.first(where: { $0.id == levelID }) {
-                 let type = level.ruleType
-                 let typeName = type.displayName.uppercased().replacingOccurrences(of: " SUDOKU", with: "") + " SUDOKU"
-                 // Note: Old logic had specific overwrites like "KNIGHT SUDOKU" vs "Knight Sudoku"
-                 // Let's keep it simple using the enum helper.
-                 return (typeName, type.iconName, type.displayName.replacingOccurrences(of: " Sudoku", with: ""))
-             }
-            return ("UNKNOWN", "questionmark.square", "Classic")
-        }
+         // Get ruleType from level (from parent VM is safest source of truth for metadata)
+         if let level = parentViewModel.levels.first(where: { $0.id == levelID }) {
+             let type = level.ruleType
+             let typeName = type.displayName.uppercased().replacingOccurrences(of: " SUDOKU", with: "") + " SUDOKU"
+             return (typeName, type.iconName, type.displayName.replacingOccurrences(of: " Sudoku", with: ""))
+         }
+        return ("UNKNOWN", "questionmark.square", "Classic")
     }
     
     // MARK: - Undo / Redo Logic

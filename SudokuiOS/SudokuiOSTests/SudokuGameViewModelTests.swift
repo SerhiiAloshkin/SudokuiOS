@@ -78,5 +78,17 @@ class SudokuGameViewModelTests: XCTestCase {
         // If the move is invalid, 'revealedMistakeIndices' or similar might be updated if 'Auto-Check' is on.
         // For this test, we confirm the input is processed.
     }
+    
+    func testLegacyRuleOverridesRemoved() {
+        // Assuming Level 331 is available in the loaded Levels.json and is a Knight variant
+        // If level 331 doesn't exist in the test mock, it will fallback safely, 
+        // but if it does exist, it should NOT be overridden to Classic.
+        let vm331 = SudokuGameViewModel(levelID: 331, levelViewModel: levelViewModel)
+        
+        if let level = levelViewModel.levels.first(where: { $0.id == 331 }) {
+            XCTAssertFalse(vm331.rules.contains(.classic) && vm331.rules.count == 1, "Level 331 should not be forced to Classic")
+            XCTAssertEqual(vm331.getRawRuleType(), level.ruleType.rawValue, "Should return actual rule type from JSON")
+        }
+    }
 }
 #endif

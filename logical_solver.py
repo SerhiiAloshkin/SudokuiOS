@@ -198,7 +198,7 @@ class HumanLogicSolver:
         
         changed = False
         
-        # 1. Passive Check: Prune adjacent to fully SOLVED cells
+        # 1. Passive Check
         if nc_active:
             for r in range(9):
                 for c in range(9):
@@ -218,7 +218,6 @@ class HumanLogicSolver:
                         is_valid = True
                         neighbors = self.get_neighbors(r, c)
                         
-                        # --- SUPERCHARGED Cell Exhaustion Check ---
                         peers = set()
                         for house in self.get_houses(r, c):
                             for hr, hc in house:
@@ -231,6 +230,7 @@ class HumanLogicSolver:
                             for kr, kc in self.get_king_moves(r, c):
                                 peers.add((kr, kc))
                                 
+                        forced_singles = {}
                         for pr, pc in peers:
                             if not self.candidates[pr][pc]: continue
                             
@@ -241,28 +241,73 @@ class HumanLogicSolver:
                             if len(surviving) == 0:
                                 is_valid = False
                                 break
+                            elif len(surviving) == 1:
+                                forced_singles[(pr, pc)] = surviving[0]
                                 
                         if not is_valid:
-                            if self.remove_candidate(r, c, v, "Non-Consecutive: Neighbor Exhaustion check"): changed = True
+                            if self.remove_candidate(r, c, v, "Look-Ahead: Neighbor Exhaustion"): changed = True
                             continue
-                        
-                        # --- EXISTING: House spots exhaustion check ---
-                        if nc_active:
-                            for house in self.get_houses(r, c):
-                                if v < 9:
-                                    spots_for_next = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v+1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
-                                    if spots_for_next == 0:
-                                        is_valid = False
-                                        break
-                                if v > 1:
-                                    spots_for_prev = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v-1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
-                                    if spots_for_prev == 0:
-                                        is_valid = False
-                                        break
-                                        
-                        if not is_valid:
-                            if self.remove_candidate(r, c, v, "Non-Consecutive: House Spots Exhaustion check"): changed = True
                             
+                        # --- NEW: Check for Peer Collisions among forced singles ---
+                        collision = False
+                        forced_items = list(forced_singles.items())
+                        for i in range(len(forced_items)):
+                            p1, val1 = forced_items[i]
+                            # Check against existing solved cells
+                            for house in self.get_houses(p1[0], p1[1]):
+                                for hr, hc in house:
+                                    if (hr, hc) != p1 and len(self.candidates[hr][hc]) == 1 and list(self.candidates[hr][hc])[0] == val1:
+                                        collision = True
+                            if knight_active:
+                                for kr, kc in self.get_knight_moves(p1[0], p1[1]):
+                                    if len(self.candidates[kr][kc]) == 1 and list(self.candidates[kr][kc])[0] == val1:
+                                        collision = True
+                            if king_active:
+                                for kr, kc in self.get_king_moves(p1[0], p1[1]):
+                                    if len(self.candidates[kr][kc]) == 1 and list(self.candidates[kr][kc])[0] == val1:
+                                        collision = True
+                            if nc_active:
+                                for nr, nc in self.get_neighbors(p1[0], p1[1]):
+                                    if len(self.candidates[nr][nc]) == 1 and abs(list(self.candidates[nr][nc])[0] - val1) == 1:
+                                        collision = True
+                                        
+                            if collision: break
+                            
+                            # Check against other forced singles
+                            for j in range(i + 1, len(forced_items)):
+                                p2, val2 = forced_items[j]
+                                if val1 == val2:
+                                    if p1[0] == p2[0] or p1[1] == p2[1] or (p1[0]//3 == p2[0]//3 and p1[1]//3 == p2[1]//3):
+                                        collision = True; break
+                                    if knight_active and (abs(p1[0]-p2[0]), abs(p1[1]-p2[1])) in [(1,2), (2,1)]:
+                                        collision = True; break
+                                    if king_active and abs(p1[0]-p2[0]) <= 1 and abs(p1[1]-p2[1]) <= 1 and p1 != p2:
+                                        collision = True; break
+                                elif nc_active and abs(val1 - val2) == 1:
+                                    if abs(p1[0]-p2[0]) + abs(p1[1]-p2[1]) == 1:
+                                        collision = True; break
+                            if collision: break
+                            
+                        if collision:
+                            if self.remove_candidate(r, c, v, "Look-Ahead: Peer Collision"): changed = True
+                            continue
+                    # --- EXISTING: House spots exhaustion check ---
+                    if nc_active:
+                        for house in self.get_houses(r, c):
+                            if v < 9:
+                                spots_for_next = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v+1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
+                                if spots_for_next == 0:
+                                    is_valid = False
+                                    break
+                            if v > 1:
+                                spots_for_prev = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v-1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
+                                if spots_for_prev == 0:
+                                    is_valid = False
+                                    break
+                                    
+                    if not is_valid:
+                        if self.remove_candidate(r, c, v, "Look-Ahead: House Spots Exhaustion"): changed = True
+                        
         return changed
 
     def _apply_thermo_rules(self):
