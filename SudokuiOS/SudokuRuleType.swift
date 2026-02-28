@@ -24,45 +24,42 @@ enum SudokuRuleType: String, Codable, CaseIterable {
     static func from(string: String?) -> SudokuRuleType {
         guard let raw = string?.lowercased() else { return .classic }
         
-        switch raw {
-        case "classic": return .classic
+        let parts = raw.components(separatedBy: ",")
         
-        // Sandwich
-        case "sandwich": return .sandwich
-            
-        // Arrow
-        case "arrow": return .arrow
-            
-        // Thermo
-        case "thermo": return .thermo
-            
-        // Killer
-        case "killer": return .killer
-            
-        // Non-Consecutive
-        case "non-consecutive", "non_consecutive": return .nonConsecutive
-            
-        // Kropki
-        case "kropki": return .kropki
-            
-        // Odd-Even
-        case "odd-even", "odd_even": return .oddEven
-            
-        // Knight
-        case "knight", "knights_move", "knight_sudoku": return .knight
-            
-        // King
-        case "king", "kings_move", "king_sudoku": return .king
-            
-        // Variant (Generic label in JSON, fallback to Classic but no warning)
-        case "variant": return .classic
-            
-        // Default / Fallback
-        default:
-            // Log warning?
-            print("WARNING: Unknown rule type '\(raw)', defaulting to classic.")
+        // First Priority: Heavy variant rules (determines the display name)
+        for part in parts {
+            let cleanPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
+            switch cleanPart {
+            case "sandwich": return .sandwich
+            case "arrow": return .arrow
+            case "thermo": return .thermo
+            case "killer": return .killer
+            case "kropki": return .kropki
+            case "odd-even", "odd_even": return .oddEven
+            case "knight", "knights_move", "knight_sudoku": return .knight
+            case "king", "kings_move", "king_sudoku": return .king
+            default: continue
+            }
+        }
+        
+        // Second Priority: modifiers like non-consecutive
+        for part in parts {
+            let cleanPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
+            if cleanPart == "non-consecutive" || cleanPart == "non_consecutive" {
+                return .nonConsecutive
+            }
+        }
+        
+        if raw == "variant" {
             return .classic
         }
+        
+        if parts.contains("classic") {
+            return .classic
+        }
+            
+        print("WARNING: Unknown rule type '\(raw)', defaulting to classic.")
+        return .classic
     }
     
     // Helper to get display name
