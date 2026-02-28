@@ -56,6 +56,7 @@ class HumanLogicSolver:
         return False
 
     def _apply_classic_rules(self):
+        import itertools
         changed = False
         
         # 1. Naked Singles
@@ -118,6 +119,39 @@ class HumanLogicSolver:
                             for r in range(9):
                                 if (r, col) not in box_cells:
                                     if self.remove_candidate(r, col, val): changed = True
+
+        # 5. Naked Triples & Hidden Pairs
+        houses_list = []
+        for i in range(9):
+            houses_list.append([(i, j) for j in range(9)]) # rows
+            houses_list.append([(j, i) for j in range(9)]) # cols
+        for br in range(3):
+            for bc in range(3):
+                houses_list.append([(br * 3 + i // 3, bc * 3 + i % 3) for i in range(9)]) # boxes
+
+        for house in houses_list:
+            # Naked Triples
+            possible_cells = [(hr, hc) for hr, hc in house if 2 <= len(self.candidates[hr][hc]) <= 3]
+            if len(possible_cells) >= 3:
+                for triple in itertools.combinations(possible_cells, 3):
+                    union_cands = set()
+                    for tr, tc in triple:
+                        union_cands.update(self.candidates[tr][tc])
+                    if len(union_cands) == 3:
+                        for hr, hc in house:
+                            if (hr, hc) not in triple:
+                                for val in union_cands:
+                                    if self.remove_candidate(hr, hc, val): changed = True
+                                    
+            # Hidden Pairs
+            for val1, val2 in itertools.combinations(range(1, 10), 2):
+                cells_with_val1 = [(hr, hc) for hr, hc in house if val1 in self.candidates[hr][hc]]
+                cells_with_val2 = [(hr, hc) for hr, hc in house if val2 in self.candidates[hr][hc]]
+                if len(cells_with_val1) == 2 and cells_with_val1 == cells_with_val2:
+                    for hr, hc in cells_with_val1:
+                        cands_to_remove = set(self.candidates[hr][hc]) - {val1, val2}
+                        for v in cands_to_remove:
+                            if self.remove_candidate(hr, hc, v): changed = True
 
         return changed
 
@@ -401,6 +435,8 @@ class HumanLogicSolver:
             internal_changed = False
             
             all_combos = self.get_sandwich_combinations(clue)
+            outside_clue = 35 - clue
+            outside_combos = self.get_sandwich_combinations(outside_clue)
             
             unique_pairs = []
             can_be_1 = [False] * 9
@@ -414,14 +450,16 @@ class HumanLogicSolver:
                     
                     dist = j - i - 1
                     valid_combos = [c for c in all_combos if len(c) == dist]
-                    if not valid_combos:
+                    valid_outside_combos = [c for c in outside_combos if len(c) == 7 - dist]
+                    
+                    if not valid_combos or not valid_outside_combos:
                         continue
                         
                     i_1_j_9 = (1 in self.candidates[r1][c1]) and (9 in self.candidates[r2][c2])
                     i_9_j_1 = (9 in self.candidates[r1][c1]) and (1 in self.candidates[r2][c2])
                     
                     if i_1_j_9 or i_9_j_1:
-                        unique_pairs.append((i, j, valid_combos))
+                        unique_pairs.append((i, j, valid_combos, valid_outside_combos))
                         if i_1_j_9:
                             can_be_1[i] = True
                             can_be_9[j] = True
@@ -447,23 +485,33 @@ class HumanLogicSolver:
                     continue
                     
                 possible_middle_values = set()
+                possible_outside_values = set()
+                can_be_middle = False
                 can_be_outside = False
                 can_be_crust = False
                 
-                for start_idx, end_idx, valid_combos in unique_pairs:
+                for start_idx, end_idx, valid_combos, valid_outside_combos in unique_pairs:
                     if start_idx < idx < end_idx:
+                        can_be_middle = True
                         for combo in valid_combos:
                             possible_middle_values.update(combo)
+                    elif idx < start_idx or idx > end_idx:
+                        can_be_outside = True
+                        for combo in valid_outside_combos:
+                            possible_outside_values.update(combo)
                     else:
-                        if idx < start_idx or idx > end_idx:
-                            can_be_outside = True
-                        if idx == start_idx or idx == end_idx:
-                            can_be_crust = True
+                        can_be_crust = True
                             
                 must_be_middle = not can_be_outside and not can_be_crust
+                must_be_outside = not can_be_middle and not can_be_crust
+                
                 if must_be_middle:
                     for v in list(self.candidates[r][c]):
                         if v not in possible_middle_values:
+                            if self.remove_candidate(r, c, v): internal_changed = True
+                elif must_be_outside:
+                    for v in list(self.candidates[r][c]):
+                        if v not in possible_outside_values:
                             if self.remove_candidate(r, c, v): internal_changed = True
 
             return internal_changed
