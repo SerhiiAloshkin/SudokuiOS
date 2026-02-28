@@ -222,73 +222,52 @@ class HumanLogicSolver:
 
     def _apply_arrow_rules(self):
         changed = False
-        arrows = self.level_data.get("arrows", [])
-        for arrow in arrows:
+        for arrow in self.level_data.get("arrows", []):
             bulb_r, bulb_c = arrow["bulb"]
             line = arrow["line"]
             
             if not self.candidates[bulb_r][bulb_c]: continue
             if any(not self.candidates[lr][lc] for lr, lc in line): continue
             
-            # Prune 1 from bulb
-            if self.remove_candidate(bulb_r, bulb_c, 1): changed = True
-            
-            # Prune 9 from line
-            for lr, lc in line:
-                if self.remove_candidate(lr, lc, 9): changed = True
-            
-            # Uniqueness check: if all line cells are in the same house
-            # they cannot repeat values
-            are_in_same_row = all(lr == line[0][0] for lr, lc in line)
-            are_in_same_col = all(lc == line[0][1] for lr, lc in line)
-            are_in_same_box = all(
-                (lr // 3 == line[0][0] // 3) and (lc // 3 == line[0][1] // 3)
-                for lr, lc in line
-            )
-            strict_uniqueness = are_in_same_row or are_in_same_col or are_in_same_box
-            
-            # Calculate minimum possible sum
-            if strict_uniqueness:
-                # If unique, we take the minimum K distinct candidates from combinations
-                # We can approximate the true minimum by taking the lowest possible unique items
-                # For safety across overlapping sets, we can find the minimum possible subset sum
-                # where each candidate comes from a different set (bipartite matching would be perfect)
-                # We'll use a simpler greedy approach for pruning the bulb:
-                # min_sum is at least sum(range(1, len(line)+1)) if all can be {1..}
-                # To be precise, we collect all possible values:
-                all_line_cands = set()
-                for lr, lc in line:
-                    all_line_cands.update(self.candidates[lr][lc])
-                sorted_cands = sorted(list(all_line_cands))
-                theoretical_min = sum(sorted_cands[:len(line)])
-                theoretical_max = sum(sorted_cands[-len(line):]) if len(sorted_cands) >= len(line) else sum(sorted_cands)
-                min_sum = max(theoretical_min, sum(min(self.candidates[lr][lc]) for lr, lc in line))
-                max_sum = min(theoretical_max, sum(max(self.candidates[lr][lc]) for lr, lc in line))
-            else:
-                min_sum = sum(min(self.candidates[lr][lc]) for lr, lc in line)
-                max_sum = sum(max(self.candidates[lr][lc]) for lr, lc in line)
-                
-            for v in list(self.candidates[bulb_r][bulb_c]):
-                if v < min_sum or v > max_sum:
-                    if self.remove_candidate(bulb_r, bulb_c, v): changed = True
-                    
-            if not self.candidates[bulb_r][bulb_c]: continue
+            valid_bulb = set()
+            valid_line = [set() for _ in line]
+            line_vals = [0] * len(line)
             max_bulb = max(self.candidates[bulb_r][bulb_c])
             
-            # Evaluate max push to lines
+            def dfs(idx, current_sum):
+                if current_sum > max_bulb: return False
+                if idx == len(line):
+                    if current_sum in self.candidates[bulb_r][bulb_c]:
+                        valid_bulb.add(current_sum)
+                        return True
+                    return False
+                    
+                lr, lc = line[idx]
+                found_any = False
+                for v in self.candidates[lr][lc]:
+                    if v == 9: continue
+                    collision = False
+                    for p_idx in range(idx):
+                        if line_vals[p_idx] == v:
+                            pr, pc = line[p_idx]
+                            if pr == lr or pc == lc or (pr//3 == lr//3 and pc//3 == lc//3):
+                                collision = True
+                                break
+                    if collision: continue
+                    
+                    line_vals[idx] = v
+                    if dfs(idx + 1, current_sum + v):
+                        valid_line[idx].add(v)
+                        found_any = True
+                return found_any
+            dfs(0, 0)
+            
+            for v in list(self.candidates[bulb_r][bulb_c]):
+                if v not in valid_bulb:
+                    if self.remove_candidate(bulb_r, bulb_c, v): changed = True
             for i, (lr, lc) in enumerate(line):
-                if strict_uniqueness:
-                    other_cands = set()
-                    for j, (or_r, or_c) in enumerate(line):
-                        if i != j:
-                            other_cands.update(self.candidates[or_r][or_c])
-                    sorted_others = sorted(list(other_cands))
-                    other_min = sum(sorted_others[:len(line)-1])
-                else:
-                    other_min = sum(min(self.candidates[or_r][or_c]) for j, (or_r, or_c) in enumerate(line) if i != j)
-                
                 for v in list(self.candidates[lr][lc]):
-                    if v + other_min > max_bulb:
+                    if v not in valid_line[i]:
                         if self.remove_candidate(lr, lc, v): changed = True
         return changed
 
@@ -427,9 +406,8 @@ class HumanLogicSolver:
         changed = False
         row_clues = self.level_data.get("sandwich_clues", {}).get("row_sums", [])
         col_clues = self.level_data.get("sandwich_clues", {}).get("col_sums", [])
-        if not row_clues or not col_clues:
-            return False
-
+        if not row_clues or not col_clues: return False
+        
         def process_sandwich(house_cells, clue):
             if clue == -1 or clue is None: return False
             internal_changed = False
@@ -438,90 +416,57 @@ class HumanLogicSolver:
             outside_clue = 35 - clue
             outside_combos = self.get_sandwich_combinations(outside_clue)
             
-            unique_pairs = []
-            can_be_1 = [False] * 9
-            can_be_9 = [False] * 9
-            
-            # 1. Identify valid pairs directly
+            valid_scenarios = []
             for i in range(9):
                 for j in range(i + 1, 9):
                     r1, c1 = house_cells[i]
                     r2, c2 = house_cells[j]
-                    
                     dist = j - i - 1
-                    valid_combos = [c for c in all_combos if len(c) == dist]
-                    valid_outside_combos = [c for c in outside_combos if len(c) == 7 - dist]
                     
-                    if not valid_combos or not valid_outside_combos:
-                        continue
+                    v_combos = [c for c in all_combos if len(c) == dist]
+                    v_out = [c for c in outside_combos if len(c) == 7 - dist]
+                    
+                    if not v_combos or not v_out: continue
                         
-                    i_1_j_9 = (1 in self.candidates[r1][c1]) and (9 in self.candidates[r2][c2])
-                    i_9_j_1 = (9 in self.candidates[r1][c1]) and (1 in self.candidates[r2][c2])
+                    i_1 = 1 in self.candidates[r1][c1]
+                    i_9 = 9 in self.candidates[r1][c1]
+                    j_1 = 1 in self.candidates[r2][c2]
+                    j_9 = 9 in self.candidates[r2][c2]
                     
-                    if i_1_j_9 or i_9_j_1:
-                        unique_pairs.append((i, j, valid_combos, valid_outside_combos))
-                        if i_1_j_9:
-                            can_be_1[i] = True
-                            can_be_9[j] = True
-                        if i_9_j_1:
-                            can_be_9[i] = True
-                            can_be_1[j] = True
-
-            # 2. Prune 1 and 9 from impossible cells
+                    if (i_1 and j_9) or (i_9 and j_1):
+                        valid_scenarios.append((i, j, v_combos, v_out))
+            if not valid_scenarios: return False
             for idx in range(9):
                 r, c = house_cells[idx]
-                if not can_be_1[idx]:
-                    if self.remove_candidate(r, c, 1): internal_changed = True
-                if not can_be_9[idx]:
-                    if self.remove_candidate(r, c, 9): internal_changed = True
-
-            if not unique_pairs:
-                return internal_changed
-
-            # 3. Streamlined Combinatorics Pruning
-            for idx in range(9):
-                r, c = house_cells[idx]
-                if len(self.candidates[r][c]) == 1 and list(self.candidates[r][c])[0] in (1, 9):
-                    continue
-                    
-                possible_middle_values = set()
-                possible_outside_values = set()
-                can_be_middle = False
-                can_be_outside = False
-                can_be_crust = False
+                allowed_values = set()
                 
-                for start_idx, end_idx, valid_combos, valid_outside_combos in unique_pairs:
-                    if start_idx < idx < end_idx:
-                        can_be_middle = True
-                        for combo in valid_combos:
-                            possible_middle_values.update(combo)
-                    elif idx < start_idx or idx > end_idx:
-                        can_be_outside = True
-                        for combo in valid_outside_combos:
-                            possible_outside_values.update(combo)
+                for start_idx, end_idx, v_combos, v_out_combos in valid_scenarios:
+                    r1, c1 = house_cells[start_idx]
+                    r2, c2 = house_cells[end_idx]
+                    i_1 = 1 in self.candidates[r1][c1]
+                    i_9 = 9 in self.candidates[r1][c1]
+                    j_1 = 1 in self.candidates[r2][c2]
+                    j_9 = 9 in self.candidates[r2][c2]
+                    
+                    if idx == start_idx:
+                        if i_1 and j_9: allowed_values.add(1)
+                        if i_9 and j_1: allowed_values.add(9)
+                    elif idx == end_idx:
+                        if i_1 and j_9: allowed_values.add(9)
+                        if i_9 and j_1: allowed_values.add(1)
+                    elif start_idx < idx < end_idx:
+                        for combo in v_combos: allowed_values.update(combo)
                     else:
-                        can_be_crust = True
+                        for combo in v_out_combos: allowed_values.update(combo)
                             
-                must_be_middle = not can_be_outside and not can_be_crust
-                must_be_outside = not can_be_middle and not can_be_crust
-                
-                if must_be_middle:
-                    for v in list(self.candidates[r][c]):
-                        if v not in possible_middle_values:
-                            if self.remove_candidate(r, c, v): internal_changed = True
-                elif must_be_outside:
-                    for v in list(self.candidates[r][c]):
-                        if v not in possible_outside_values:
-                            if self.remove_candidate(r, c, v): internal_changed = True
-
+                for v in list(self.candidates[r][c]):
+                    if v not in allowed_values:
+                        if self.remove_candidate(r, c, v): internal_changed = True
             return internal_changed
-
-        # Apply to rows and columns
         for r in range(9):
             if process_sandwich([(r, c) for c in range(9)], row_clues[r]): changed = True
         for c in range(9):
             if process_sandwich([(r, c) for r in range(9)], col_clues[c]): changed = True
-            
         return changed
 
     def solve(self):
