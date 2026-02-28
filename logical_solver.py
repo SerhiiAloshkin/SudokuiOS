@@ -2,8 +2,9 @@ import json
 import sys
 
 class HumanLogicSolver:
-    def __init__(self, level_data):
+    def __init__(self, level_data, step_mode=False):
         self.level_data = level_data
+        self.step_mode = step_mode
         self.candidates = [[set(range(1, 10)) for _ in range(9)] for _ in range(9)]
         
         board_str = self.level_data.get("board", "0"*81)
@@ -49,9 +50,19 @@ class HumanLogicSolver:
                     moves.append((nr, nc))
         return moves
 
-    def remove_candidate(self, r, c, val):
+    def remove_candidate(self, r, c, val, reason="Logic Deduction"):
         if val in self.candidates[r][c]:
+            was_unsolved = len(self.candidates[r][c]) > 1
             self.candidates[r][c].remove(val)
+            if was_unsolved and len(self.candidates[r][c]) == 1:
+                if getattr(self, 'step_mode', False):
+                    new_val = list(self.candidates[r][c])[0]
+                    print(f"\n--> NEW NUMBER FOUND: {new_val} at [{r}, {c}]!")
+                    print(f"--> TRIGGERED BY: {reason}")
+                    self.print_board()
+                    ans = input("Press 'y' to continue stepping, or 'n' to finish without stopping: ")
+                    if ans.lower() == 'n':
+                        self.step_mode = False
             return True
         return False
 
@@ -67,7 +78,7 @@ class HumanLogicSolver:
                     for house in self.get_houses(r, c):
                         for hr, hc in house:
                             if (hr, hc) != (r, c):
-                                if self.remove_candidate(hr, hc, val): changed = True
+                                if self.remove_candidate(hr, hc, val, "Classic: Naked Single"): changed = True
 
         # 2. Hidden Singles
         for r in range(9):
@@ -79,8 +90,9 @@ class HumanLogicSolver:
                             count = sum(1 for hr, hc in house if val in self.candidates[hr][hc])
                             if count == 1:
                                 if len(self.candidates[r][c]) > 1:
-                                    self.candidates[r][c] = {val}
-                                    changed = True
+                                    for v in list(self.candidates[r][c]):
+                                        if v != val:
+                                            if self.remove_candidate(r, c, v, "Classic: Hidden Single"): changed = True
                                     found_hidden = True
                                 break
                         if found_hidden: break
@@ -98,7 +110,7 @@ class HumanLogicSolver:
                             for hr, hc in house:
                                 if (hr, hc) not in match_cells:
                                     for val in pair:
-                                        if self.remove_candidate(hr, hc, val): changed = True
+                                        if self.remove_candidate(hr, hc, val, "Classic: Naked Pair"): changed = True
 
         # 4. Pointing Pairs / Box-Line Reduction
         for br in range(3):
@@ -112,13 +124,13 @@ class HumanLogicSolver:
                             row = cells_with_val[0][0]
                             for c in range(9):
                                 if (row, c) not in box_cells:
-                                    if self.remove_candidate(row, c, val): changed = True
+                                    if self.remove_candidate(row, c, val, "Classic: Pointing Pair/Tuple (Row)"): changed = True
                         # Check if they share a column
                         if all(c == cells_with_val[0][1] for r, c in cells_with_val):
                             col = cells_with_val[0][1]
                             for r in range(9):
                                 if (r, col) not in box_cells:
-                                    if self.remove_candidate(r, col, val): changed = True
+                                    if self.remove_candidate(r, col, val, "Classic: Pointing Pair/Tuple (Column)"): changed = True
 
         # 5. Naked Triples & Hidden Pairs
         houses_list = []
@@ -141,7 +153,7 @@ class HumanLogicSolver:
                         for hr, hc in house:
                             if (hr, hc) not in triple:
                                 for val in union_cands:
-                                    if self.remove_candidate(hr, hc, val): changed = True
+                                    if self.remove_candidate(hr, hc, val, "Classic: Naked Triple"): changed = True
                                     
             # Hidden Pairs
             for val1, val2 in itertools.combinations(range(1, 10), 2):
@@ -151,7 +163,7 @@ class HumanLogicSolver:
                     for hr, hc in cells_with_val1:
                         cands_to_remove = set(self.candidates[hr][hc]) - {val1, val2}
                         for v in cands_to_remove:
-                            if self.remove_candidate(hr, hc, v): changed = True
+                            if self.remove_candidate(hr, hc, v, "Classic: Hidden Pair"): changed = True
 
         return changed
 
@@ -164,7 +176,7 @@ class HumanLogicSolver:
                 if len(self.candidates[r][c]) == 1:
                     val = list(self.candidates[r][c])[0]
                     for nr, nc in self.get_knight_moves(r, c):
-                        if self.remove_candidate(nr, nc, val): changed = True
+                        if self.remove_candidate(nr, nc, val, "Anti-Knight Rule"): changed = True
         return changed
 
     def _apply_king_rules(self):
@@ -176,51 +188,80 @@ class HumanLogicSolver:
                 if len(self.candidates[r][c]) == 1:
                     val = list(self.candidates[r][c])[0]
                     for nr, nc in self.get_king_moves(r, c):
-                        if self.remove_candidate(nr, nc, val): changed = True
+                        if self.remove_candidate(nr, nc, val, "Anti-King Rule"): changed = True
         return changed
 
     def _apply_non_consecutive_implications(self):
-        if "non-consecutive" not in self.rules and "non-consecutive" not in self.constraints:
-            return False
-            
+        nc_active = "non-consecutive" in self.rules or "non-consecutive" in self.constraints
+        knight_active = "knight" in self.rules or "knight" in self.constraints
+        king_active = "king" in self.rules or "king" in self.constraints
+        
         changed = False
         
         # 1. Passive Check: Prune adjacent to fully SOLVED cells
-        for r in range(9):
-            for c in range(9):
-                if len(self.candidates[r][c]) == 1:
-                    val = list(self.candidates[r][c])[0]
-                    for nr, nc in self.get_neighbors(r, c):
-                        if val - 1 in self.candidates[nr][nc]:
-                            if self.remove_candidate(nr, nc, val - 1): changed = True
-                        if val + 1 in self.candidates[nr][nc]:
-                            if self.remove_candidate(nr, nc, val + 1): changed = True
-                            
+        if nc_active:
+            for r in range(9):
+                for c in range(9):
+                    if len(self.candidates[r][c]) == 1:
+                        val = list(self.candidates[r][c])[0]
+                        for nr, nc in self.get_neighbors(r, c):
+                            if val - 1 in self.candidates[nr][nc]:
+                                if self.remove_candidate(nr, nc, val - 1, "Non-Consecutive: Adjacent to solved cell (-1)"): changed = True
+                            if val + 1 in self.candidates[nr][nc]:
+                                if self.remove_candidate(nr, nc, val + 1, "Non-Consecutive: Adjacent to solved cell (+1)"): changed = True
+                                
         # 2. Active Implication Check (Look-ahead)
         for r in range(9):
             for c in range(9):
                 if len(self.candidates[r][c]) > 1:
                     for v in list(self.candidates[r][c]):
-                        neighbors = self.get_neighbors(r, c)
                         is_valid = True
+                        neighbors = self.get_neighbors(r, c)
                         
+                        # --- SUPERCHARGED Cell Exhaustion Check ---
+                        peers = set()
                         for house in self.get_houses(r, c):
-                            # Check if placing 'v' destroys all spots for 'v+1'
-                            if v < 9:
-                                spots_for_next = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v+1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
-                                if spots_for_next == 0:
-                                    is_valid = False
-                                    break
-                                    
-                            # Check if placing 'v' destroys all spots for 'v-1'
-                            if v > 1:
-                                spots_for_prev = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v-1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
-                                if spots_for_prev == 0:
-                                    is_valid = False
-                                    break
-                                    
+                            for hr, hc in house:
+                                if (hr, hc) != (r, c):
+                                    peers.add((hr, hc))
+                        if knight_active:
+                            for kr, kc in self.get_knight_moves(r, c):
+                                peers.add((kr, kc))
+                        if king_active:
+                            for kr, kc in self.get_king_moves(r, c):
+                                peers.add((kr, kc))
+                                
+                        for pr, pc in peers:
+                            if not self.candidates[pr][pc]: continue
+                            
+                            is_neighbor = (pr, pc) in neighbors
+                            surviving = [cv for cv in self.candidates[pr][pc] 
+                                         if cv != v and (not (nc_active and is_neighbor and abs(cv - v) == 1))]
+                                
+                            if len(surviving) == 0:
+                                is_valid = False
+                                break
+                                
                         if not is_valid:
-                            if self.remove_candidate(r, c, v): changed = True
+                            if self.remove_candidate(r, c, v, "Non-Consecutive: Neighbor Exhaustion check"): changed = True
+                            continue
+                        
+                        # --- EXISTING: House spots exhaustion check ---
+                        if nc_active:
+                            for house in self.get_houses(r, c):
+                                if v < 9:
+                                    spots_for_next = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v+1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
+                                    if spots_for_next == 0:
+                                        is_valid = False
+                                        break
+                                if v > 1:
+                                    spots_for_prev = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v-1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
+                                    if spots_for_prev == 0:
+                                        is_valid = False
+                                        break
+                                        
+                        if not is_valid:
+                            if self.remove_candidate(r, c, v, "Non-Consecutive: House Spots Exhaustion check"): changed = True
                             
         return changed
 
@@ -235,7 +276,7 @@ class HumanLogicSolver:
                 min_prev = min(self.candidates[r_prev][c_prev])
                 for v in list(self.candidates[r_curr][c_curr]):
                     if v <= min_prev:
-                        if self.remove_candidate(r_curr, c_curr, v): changed = True
+                        if self.remove_candidate(r_curr, c_curr, v, "Thermo: Minimum Boundary"): changed = True
             for i in range(len(path)-2, -1, -1):
                 r_curr, c_curr = path[i]
                 r_next, c_next = path[i+1]
@@ -243,7 +284,7 @@ class HumanLogicSolver:
                 max_next = max(self.candidates[r_next][c_next])
                 for v in list(self.candidates[r_curr][c_curr]):
                     if v >= max_next:
-                        if self.remove_candidate(r_curr, c_curr, v): changed = True
+                        if self.remove_candidate(r_curr, c_curr, v, "Thermo: Maximum Boundary"): changed = True
         return changed
 
     def _apply_arrow_rules(self):
@@ -308,11 +349,11 @@ class HumanLogicSolver:
             
             for v in list(self.candidates[bulb_r][bulb_c]):
                 if v not in valid_bulb:
-                    if self.remove_candidate(bulb_r, bulb_c, v): changed = True
+                    if self.remove_candidate(bulb_r, bulb_c, v, "Arrow: Invalid Bulb Candidate via DFS"): changed = True
             for i, (lr, lc) in enumerate(line):
                 for v in list(self.candidates[lr][lc]):
                     if v not in valid_line[i]:
-                        if self.remove_candidate(lr, lc, v): changed = True
+                        if self.remove_candidate(lr, lc, v, "Arrow: Invalid Line Candidate via DFS"): changed = True
         return changed
 
     def _apply_killer_rules(self):
@@ -360,7 +401,7 @@ class HumanLogicSolver:
             for k, (r, c) in enumerate(cells):
                 for v in list(self.candidates[r][c]):
                     if v not in valid_assignments[k]:
-                        if self.remove_candidate(r, c, v): changed = True
+                        if self.remove_candidate(r, c, v, "Killer: Invalid Cage Candidate via DFS"): changed = True
         # 2. Rule of 45 (Innies / Remaining Cells inside a House)
         houses = []
         for i in range(9):
@@ -430,7 +471,7 @@ class HumanLogicSolver:
                 for k, (r, c) in enumerate(remaining_cells):
                     for v in list(self.candidates[r][c]):
                         if v not in valid_rem_assignments[k]:
-                            if self.remove_candidate(r, c, v): changed = True
+                            if self.remove_candidate(r, c, v, "Killer: Rule of 45 Innies Count via DFS"): changed = True
         
         return changed
 
@@ -445,10 +486,10 @@ class HumanLogicSolver:
             r, c = i // 9, i % 9
             if char == '1':
                 for v in [2, 4, 6, 8]:
-                    if self.remove_candidate(r, c, v): changed = True
+                    if self.remove_candidate(r, c, v, "Odd/Even: Must be Odd constraint"): changed = True
             elif char == '2':
                 for v in [1, 3, 5, 7, 9]:
-                    if self.remove_candidate(r, c, v): changed = True
+                    if self.remove_candidate(r, c, v, "Odd/Even: Must be Even constraint"): changed = True
         return changed
 
     def _apply_kropki_rules(self):
@@ -460,7 +501,13 @@ class HumanLogicSolver:
         def apply_dot(dot_list, relation_fn):
             c = False
             for d in dot_list:
-                (r1, c1), (r2, c2) = d[0], d[1]
+                if isinstance(d, dict):
+                    r1, c1, r2, c2 = d["r1"], d["c1"], d["r2"], d["c2"]
+                elif len(d) == 4:
+                    r1, c1, r2, c2 = d[0], d[1], d[2], d[3]
+                else:
+                    (r1, c1), (r2, c2) = d[0], d[1]
+                    
                 if not self.candidates[r1][c1] or not self.candidates[r2][c2]: continue
                 
                 cands1 = self.candidates[r1][c1]
@@ -468,10 +515,10 @@ class HumanLogicSolver:
                 
                 for v1 in list(cands1):
                     if not any(relation_fn(v1, v2) for v2 in cands2):
-                        if self.remove_candidate(r1, c1, v1): c = True
+                        if self.remove_candidate(r1, c1, v1, "Kropki: Positive Dot Verification Failed"): c = True
                 for v2 in list(cands2):
                     if not any(relation_fn(v1, v2) for v1 in cands1):
-                        if self.remove_candidate(r2, c2, v2): c = True
+                        if self.remove_candidate(r2, c2, v2, "Kropki: Positive Dot Verification Failed"): c = True
             return c
             
         if apply_dot(white_dots, lambda a, b: abs(a - b) == 1): changed = True
@@ -481,11 +528,29 @@ class HumanLogicSolver:
             wd_set = set()
             bd_set = set()
             for d in white_dots:
-                wd_set.add((tuple(d[0]), tuple(d[1])))
-                wd_set.add((tuple(d[1]), tuple(d[0])))
+                if isinstance(d, dict):
+                    p1 = (d["r1"], d["c1"])
+                    p2 = (d["r2"], d["c2"])
+                elif len(d) == 4:
+                    p1 = (d[0], d[1])
+                    p2 = (d[2], d[3])
+                else:
+                    p1 = tuple(d[0])
+                    p2 = tuple(d[1])
+                wd_set.add((p1, p2))
+                wd_set.add((p2, p1))
             for d in black_dots:
-                bd_set.add((tuple(d[0]), tuple(d[1])))
-                bd_set.add((tuple(d[1]), tuple(d[0])))
+                if isinstance(d, dict):
+                    p1 = (d["r1"], d["c1"])
+                    p2 = (d["r2"], d["c2"])
+                elif len(d) == 4:
+                    p1 = (d[0], d[1])
+                    p2 = (d[2], d[3])
+                else:
+                    p1 = tuple(d[0])
+                    p2 = tuple(d[1])
+                bd_set.add((p1, p2))
+                bd_set.add((p2, p1))
                 
             for r in range(9):
                 for c in range(9):
@@ -502,18 +567,18 @@ class HumanLogicSolver:
                             if not has_white:
                                 for v1 in list(cands1):
                                     if all(abs(v1 - v2) == 1 for v2 in cands2):
-                                        if self.remove_candidate(r, c, v1): changed = True
+                                        if self.remove_candidate(r, c, v1, "Kropki: Negative Dot Elimination (White)"): changed = True
                                 for v2 in list(cands2):
                                     if all(abs(v1 - v2) == 1 for v1 in cands1):
-                                        if self.remove_candidate(nr, nc, v2): changed = True
+                                        if self.remove_candidate(nr, nc, v2, "Kropki: Negative Dot Elimination (White)"): changed = True
                                         
                             if not has_black:
                                 for v1 in list(cands1):
                                     if all(v1 == 2*v2 or v2 == 2*v1 for v2 in cands2):
-                                        if self.remove_candidate(r, c, v1): changed = True
+                                        if self.remove_candidate(r, c, v1, "Kropki: Negative Dot Elimination (Black)"): changed = True
                                 for v2 in list(cands2):
                                     if all(v1 == 2*v2 or v2 == 2*v1 for v1 in cands1):
-                                        if self.remove_candidate(nr, nc, v2): changed = True
+                                        if self.remove_candidate(nr, nc, v2, "Kropki: Negative Dot Elimination (Black)"): changed = True
         return changed
 
     def get_sandwich_combinations(self, target):
@@ -646,7 +711,7 @@ class HumanLogicSolver:
                             
                 for v in list(self.candidates[r][c]):
                     if v not in allowed_values:
-                        if self.remove_candidate(r, c, v): internal_changed = True
+                        if self.remove_candidate(r, c, v, "Sandwich: Invalid Scenario Assignment"): internal_changed = True
             return internal_changed
             
         for r in range(9):
@@ -701,40 +766,72 @@ class HumanLogicSolver:
         print("-" * 19)
 
 if __name__ == "__main__":
-    # 1. Check if the user provided an argument in the terminal
     if len(sys.argv) < 2:
-        print("Usage: python logical_solver.py <level_number>")
-        print("Example: python logical_solver.py 582")
-        sys.exit(1) # Exit with an error code
-        
-    # 2. Try to convert the argument to an integer
-    try:
-        LEVEL_ID_TO_TEST = int(sys.argv[1])
-    except ValueError:
-        print("Error: The level number must be a valid integer.")
+        print("Usage: python logical_solver.py [-step] <level_number> OR <start>-<end> OR all")
         sys.exit(1)
-
+        
+    args = sys.argv[1:]
+    step_mode = False
+    if "-step" in args:
+        step_mode = True
+        args.remove("-step")
+        
+    if not args:
+        print("Error: Missing level argument.")
+        sys.exit(1)
+        
+    arg = args[0]
+    levels_to_test = []
+    # 2. Parse the command line argument
+    if "-" in arg:
+        try:
+            start, end = map(int, arg.split("-"))
+            levels_to_test = list(range(start, end + 1))
+        except ValueError:
+            print("Error: Invalid range format. Use <start>-<end> (e.g., 251-254).")
+            sys.exit(1)
+    elif arg.lower() == "all":
+        levels_to_test = "all"
+    else:
+        try:
+            levels_to_test = [int(arg)]
+        except ValueError:
+            print("Error: The level number must be a valid integer, range, or 'all'.")
+            sys.exit(1)
     # 3. Path to your master levels file
     file_path = "SudokuiOS/Levels.json" 
-
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             all_levels = json.load(f)
         
-        # Search for the level
-        target_level = None
-        for level in all_levels:
-            if level.get("id") == LEVEL_ID_TO_TEST:
-                target_level = level
-                break
-        
-        # Run the solver if found
-        if target_level:
-            print(f"Testing Level {target_level['id']} (Rules: {target_level.get('ruleType', 'classic')})...")
-            solver = HumanLogicSolver(target_level)
-            solver.solve()
+        target_levels = []
+        if levels_to_test == "all":
+            target_levels = all_levels
         else:
-            print(f"Error: Level {LEVEL_ID_TO_TEST} was not found in {file_path}.")
-
+            target_levels = [lvl for lvl in all_levels if lvl.get("id") in levels_to_test]
+        
+        if not target_levels:
+            print(f"Error: No levels found matching '{arg}' in {file_path}.")
+            sys.exit(1)
+        success_count = 0
+        fail_count = 0
+        failed_levels = []
+        for level in target_levels:
+            print(f"\n==========================================")
+            print(f"Testing Level {level['id']} (Rules: {level.get('ruleType', 'classic')})...")
+            solver = HumanLogicSolver(level, step_mode=step_mode)
+            if solver.solve():
+                success_count += 1
+            else:
+                fail_count += 1
+                failed_levels.append(level['id'])
+        print(f"\n==========================================")
+        print("BULK TESTING COMPLETE")
+        print(f"Total levels tested: {len(target_levels)}")
+        print(f"✅ Successfully Solved: {success_count}")
+        print(f"❌ Failed / Stuck: {fail_count}")
+        if failed_levels:
+            print(f"Failed Level IDs: {failed_levels}")
+        print(f"==========================================\n")
     except FileNotFoundError:
         print(f"Error: Could not find the file at {file_path}. Make sure you are in the correct directory.")
