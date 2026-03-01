@@ -85,17 +85,24 @@ class HumanLogicSolver:
             for c in range(9):
                 if len(self.candidates[r][c]) > 1:
                     found_hidden = False
-                    for val in list(self.candidates[r][c]):
+                    # Use a static list of candidates to prevent iteration skipping when the set shrinks
+                    current_candidates = list(self.candidates[r][c])
+                    for val in current_candidates:
+                        # Re-verify the value wasn't eliminated in a previous iteration of this cell's loop
+                        if val not in self.candidates[r][c]: continue
+                        
                         for house in self.get_houses(r, c):
                             count = sum(1 for hr, hc in house if val in self.candidates[hr][hc])
                             if count == 1:
                                 if len(self.candidates[r][c]) > 1:
-                                    for v in list(self.candidates[r][c]):
-                                        if v != val:
-                                            if self.remove_candidate(r, c, v, "Classic: Hidden Single"): changed = True
+                                    # Copy the remaining values before removing to avoid concurrent modification issues
+                                    values_to_remove = [v for v in self.candidates[r][c] if v != val]
+                                    for v in values_to_remove:
+                                        if self.remove_candidate(r, c, v, "Classic: Hidden Single"): changed = True
                                     found_hidden = True
                                 break
                         if found_hidden: break
+
 
         # 3. Naked Pairs
         for r in range(9):
@@ -143,16 +150,17 @@ class HumanLogicSolver:
 
         for house in houses_list:
             # Naked Triples
-            possible_cells = [(hr, hc) for hr, hc in house if 2 <= len(self.candidates[hr][hc]) <= 3]
-            if len(possible_cells) >= 3:
-                for triple in itertools.combinations(possible_cells, 3):
-                    union_cands = set()
-                    for tr, tc in triple:
-                        union_cands.update(self.candidates[tr][tc])
-                    if len(union_cands) == 3:
+            potential_triples = [c for c in house if 2 <= len(self.candidates[c[0]][c[1]]) <= 3]
+            if len(potential_triples) >= 3:
+                import itertools
+                for combo in itertools.combinations(potential_triples, 3):
+                    c1, c2, c3 = combo
+                    combined_vals = self.candidates[c1[0]][c1[1]] | self.candidates[c2[0]][c2[1]] | self.candidates[c3[0]][c3[1]]
+                    if len(combined_vals) == 3:
                         for hr, hc in house:
-                            if (hr, hc) not in triple:
-                                for val in union_cands:
+                            if (hr, hc) not in combo:
+                                values_to_remove = [v for v in combined_vals if v in self.candidates[hr][hc]]
+                                for val in values_to_remove:
                                     if self.remove_candidate(hr, hc, val, "Classic: Naked Triple"): changed = True
                                     
             # Hidden Pairs
@@ -198,7 +206,16 @@ class HumanLogicSolver:
         
         changed = False
         
-        # 1. Passive Check
+        # Generate all 27 houses for Global Starvation
+        all_houses = []
+        for i in range(9):
+            all_houses.append([(i, c) for c in range(9)])
+            all_houses.append([(r, i) for r in range(9)])
+        for br in range(3):
+            for bc in range(3):
+                all_houses.append([(br * 3 + i // 3, bc * 3 + i % 3) for i in range(9)])
+                
+        # 1. Passive Check: Prune adjacent to fully SOLVED cells
         if nc_active:
             for r in range(9):
                 for c in range(9):
@@ -210,6 +227,23 @@ class HumanLogicSolver:
                             if val + 1 in self.candidates[nr][nc]:
                                 if self.remove_candidate(nr, nc, val + 1, "Non-Consecutive: Adjacent to solved cell (+1)"): changed = True
                                 
+        # 1.5 Active Non-Consecutive Projection
+        if nc_active:
+            for r in range(9):
+                for c in range(9):
+                    for v in list(self.candidates[r][c]):
+                        is_only_spot = False
+                        for house in self.get_houses(r, c):
+                            spots = sum(1 for hr, hc in house if v in self.candidates[hr][hc])
+                            if spots == 1:
+                                is_only_spot = True
+                                break
+                        if is_only_spot:
+                            for nr, nc in self.get_neighbors(r, c):
+                                if v - 1 in self.candidates[nr][nc]:
+                                    if self.remove_candidate(nr, nc, v - 1, "Non-Consecutive: Projected Hidden Single (-1)"): changed = True
+                                if v + 1 in self.candidates[nr][nc]:
+                                    if self.remove_candidate(nr, nc, v + 1, "Non-Consecutive: Projected Hidden Single (+1)"): changed = True
         # 2. Active Implication Check (Look-ahead)
         for r in range(9):
             for c in range(9):
@@ -218,6 +252,7 @@ class HumanLogicSolver:
                         is_valid = True
                         neighbors = self.get_neighbors(r, c)
                         
+                        # --- Cell Exhaustion Check ---
                         peers = set()
                         for house in self.get_houses(r, c):
                             for hr, hc in house:
@@ -245,15 +280,14 @@ class HumanLogicSolver:
                                 forced_singles[(pr, pc)] = surviving[0]
                                 
                         if not is_valid:
-                            if self.remove_candidate(r, c, v, "Look-Ahead: Neighbor Exhaustion"): changed = True
+                            if self.remove_candidate(r, c, v, "Look-Ahead: Neighbor Exhaustion check"): changed = True
                             continue
                             
-                        # --- NEW: Check for Peer Collisions among forced singles ---
+                        # --- Peer Collisions among forced singles ---
                         collision = False
                         forced_items = list(forced_singles.items())
                         for i in range(len(forced_items)):
                             p1, val1 = forced_items[i]
-                            # Check against existing solved cells
                             for house in self.get_houses(p1[0], p1[1]):
                                 for hr, hc in house:
                                     if (hr, hc) != p1 and len(self.candidates[hr][hc]) == 1 and list(self.candidates[hr][hc])[0] == val1:
@@ -270,10 +304,8 @@ class HumanLogicSolver:
                                 for nr, nc in self.get_neighbors(p1[0], p1[1]):
                                     if len(self.candidates[nr][nc]) == 1 and abs(list(self.candidates[nr][nc])[0] - val1) == 1:
                                         collision = True
-                                        
                             if collision: break
                             
-                            # Check against other forced singles
                             for j in range(i + 1, len(forced_items)):
                                 p2, val2 = forced_items[j]
                                 if val1 == val2:
@@ -289,25 +321,31 @@ class HumanLogicSolver:
                             if collision: break
                             
                         if collision:
-                            if self.remove_candidate(r, c, v, "Look-Ahead: Peer Collision"): changed = True
+                            if self.remove_candidate(r, c, v, "Look-Ahead: Peer Collision (Forced Singles)"): changed = True
                             continue
-                    # --- EXISTING: House spots exhaustion check ---
-                    if nc_active:
-                        for house in self.get_houses(r, c):
-                            if v < 9:
-                                spots_for_next = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v+1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
-                                if spots_for_next == 0:
+                        # --- Global House Starvation check ---
+                        for house in all_houses:
+                            if (r, c) not in house:
+                                spots_v = sum(1 for hr, hc in house if v in self.candidates[hr][hc] and (hr, hc) not in peers)
+                                if spots_v == 0:
                                     is_valid = False
                                     break
-                            if v > 1:
-                                spots_for_prev = sum(1 for hr, hc in house if (hr, hc) != (r, c) and v-1 in self.candidates[hr][hc] and (hr, hc) not in neighbors)
-                                if spots_for_prev == 0:
+                            
+                            if nc_active and v < 9:
+                                spots_next = sum(1 for hr, hc in house if v+1 in self.candidates[hr][hc] and (hr, hc) not in neighbors and (hr, hc) != (r, c))
+                                if spots_next == 0:
                                     is_valid = False
                                     break
                                     
-                    if not is_valid:
-                        if self.remove_candidate(r, c, v, "Look-Ahead: House Spots Exhaustion"): changed = True
-                        
+                            if nc_active and v > 1:
+                                spots_prev = sum(1 for hr, hc in house if v-1 in self.candidates[hr][hc] and (hr, hc) not in neighbors and (hr, hc) != (r, c))
+                                if spots_prev == 0:
+                                    is_valid = False
+                                    break
+                                    
+                        if not is_valid:
+                            if self.remove_candidate(r, c, v, "Look-Ahead: Global House Starvation"): changed = True
+                            
         return changed
 
     def _apply_thermo_rules(self):
@@ -530,11 +568,17 @@ class HumanLogicSolver:
             if i >= 81: break
             r, c = i // 9, i % 9
             if char == '1':
-                for v in [2, 4, 6, 8]:
-                    if self.remove_candidate(r, c, v, "Odd/Even: Must be Odd constraint"): changed = True
+                # Must be Odd (1,3,5,7,9), remove Even
+                cands = list(self.candidates[r][c])
+                for v in cands:
+                    if v in [2, 4, 6, 8]:
+                        if self.remove_candidate(r, c, v, "Odd/Even: Must be Odd constraint"): changed = True
             elif char == '2':
-                for v in [1, 3, 5, 7, 9]:
-                    if self.remove_candidate(r, c, v, "Odd/Even: Must be Even constraint"): changed = True
+                # Must be Even (2,4,6,8), remove Odd
+                cands = list(self.candidates[r][c])
+                for v in cands:
+                    if v in [1, 3, 5, 7, 9]:
+                        if self.remove_candidate(r, c, v, "Odd/Even: Must be Even constraint"): changed = True
         return changed
 
     def _apply_kropki_rules(self):
@@ -825,23 +869,30 @@ if __name__ == "__main__":
         print("Error: Missing level argument.")
         sys.exit(1)
         
-    arg = args[0]
+    # Combine all remaining arguments to safely handle spaces (e.g. "333, 336" vs "333,336")
+    raw_arg = "".join(args)
     levels_to_test = []
     # 2. Parse the command line argument
-    if "-" in arg:
+    if raw_arg.lower() == "all":
+        levels_to_test = "all"
+    elif "," in raw_arg:
         try:
-            start, end = map(int, arg.split("-"))
+            levels_to_test = [int(x.strip()) for x in raw_arg.split(",") if x.strip()]
+        except ValueError:
+            print("Error: Invalid list format. Use comma-separated integers (e.g., 333, 336, 339).")
+            sys.exit(1)
+    elif "-" in raw_arg:
+        try:
+            start, end = map(int, raw_arg.split("-"))
             levels_to_test = list(range(start, end + 1))
         except ValueError:
             print("Error: Invalid range format. Use <start>-<end> (e.g., 251-254).")
             sys.exit(1)
-    elif arg.lower() == "all":
-        levels_to_test = "all"
     else:
         try:
-            levels_to_test = [int(arg)]
+            levels_to_test = [int(raw_arg)]
         except ValueError:
-            print("Error: The level number must be a valid integer, range, or 'all'.")
+            print("Error: The argument must be a valid integer, range, comma-separated list, or 'all'.")
             sys.exit(1)
     # 3. Path to your master levels file
     file_path = "SudokuiOS/Levels.json" 
