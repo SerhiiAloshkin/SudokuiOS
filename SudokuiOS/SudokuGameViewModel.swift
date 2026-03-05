@@ -1182,12 +1182,6 @@ class SudokuGameViewModel: ObservableObject {
             return .selected
         }
         
-        // Multi-Selection Clutter Reduction:
-        // If multiple cells are selected, disable 'Same Number' and 'Relating' highlights for unselected cells.
-        if selectedIndices.count > 1 {
-            return .none
-        }
-        
         // 2. Logic based on Explicit Highlight (No Anchor needed)
         if let explicit = explicitHighlightedDigit {
              let val = getValueAt(index)
@@ -1205,27 +1199,29 @@ class SudokuGameViewModel: ObservableObject {
         
         // GLOBAL HIGHLIGHTS (Applied regardless of Minimal/Restriction/Potential Mode)
         
-        // a) Same Digit
-        if selectedValue != 0 {
-            if settings?.isHighlightSameNumberEnabled ?? true {
-                let currentValue = getValueAt(index)
-                if currentValue != 0 && currentValue == selectedValue {
-                    return .sameValue
+        if selectedIndices.count == 1 {
+            // a) Same Digit
+            if selectedValue != 0 {
+                if settings?.isHighlightSameNumberEnabled ?? true {
+                    let currentValue = getValueAt(index)
+                    if currentValue != 0 && currentValue == selectedValue {
+                        return .sameValue
+                    }
                 }
-            }
-        } else {
-             // b) Check for Note Highlighting (If selected cell is empty and has notes)
-             if settings?.isHighlightSameNoteEnabled ?? true {
-                 if index != anchor && index < cells.count && anchor < cells.count {
-                     let anchorNotes = cells[anchor].notes
-                     let currentNotes = cells[index].notes
-                     
-                     // If the selected cell has notes, and the current cell shares at least one note
-                     if !anchorNotes.isEmpty && !anchorNotes.isDisjoint(with: currentNotes) {
-                         return .relating // Use relating (subtle) for shared notes
+            } else {
+                 // b) Check for Note Highlighting (If selected cell is empty and has notes)
+                 if settings?.isHighlightSameNoteEnabled ?? true {
+                     if index != anchor && index < cells.count && anchor < cells.count {
+                         let anchorNotes = cells[anchor].notes
+                         let currentNotes = cells[index].notes
+                         
+                         // If the selected cell has notes, and the current cell shares at least one note
+                         if !anchorNotes.isEmpty && !anchorNotes.isDisjoint(with: currentNotes) {
+                             return .relating // Use relating (subtle) for shared notes
+                         }
                      }
                  }
-             }
+            }
         }
         
         // If Minimal Mode is ON, we STOP here (no Neighborhood/Potential highlights)
@@ -1241,7 +1237,7 @@ class SudokuGameViewModel: ObservableObject {
         
         if mode == .potential {
              // POTENTIAL MODE (If enabled in settings)
-             if selectedValue != 0 {
+             if selectedIndices.count == 1 && selectedValue != 0 {
                 let digit = selectedValue
                 let currentValue = getValueAt(index)
                 
@@ -1314,8 +1310,14 @@ class SudokuGameViewModel: ObservableObject {
         } else {
             // STANDARD / RESTRICTION (Legacy Default)
             
-            // b) Neighborhood (Row, Col, Box)
-            if isSameNeighborhood(index1: anchor, index2: index) {
+            // b) Neighborhood (Row, Col, Box) - Intersection for multi-select
+            guard !selectedIndices.isEmpty else { return .none }
+            
+            let isRestrictedByAll = selectedIndices.allSatisfy { selectedIndex in
+                isSameNeighborhood(index1: selectedIndex, index2: index)
+            }
+            
+            if isRestrictedByAll {
                 return .relating
             }
         }
