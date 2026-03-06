@@ -1241,7 +1241,9 @@ class SudokuGameViewModel: ObservableObject {
              
              // Highlight matching numbers
              if val != 0 && val == explicit {
-                 return .sameValue
+                 if settings?.isHighlightSameNumberEnabled ?? true {
+                     return .sameValue
+                 }
              }
              
              // Highlight matching notes
@@ -1268,11 +1270,14 @@ class SudokuGameViewModel: ObservableObject {
         if selectedIndices.count == 1 {
             // a) Same Digit
             if selectedValue != 0 {
-                if settings?.isHighlightSameNumberEnabled ?? true {
-                    let currentValue = getValueAt(index)
-                    if currentValue != 0 && currentValue == selectedValue {
+                let currentValue = getValueAt(index)
+                
+                if currentValue != 0 && currentValue == selectedValue {
+                    if settings?.isHighlightSameNumberEnabled ?? true {
                         return .sameValue
-                    } else if currentValue == 0 && cells[index].notes.contains(selectedValue) {
+                    }
+                } else if currentValue == 0 && cells[index].notes.contains(selectedValue) {
+                    if settings?.isHighlightSameNoteEnabled ?? true {
                         return .sameNote
                     }
                 }
