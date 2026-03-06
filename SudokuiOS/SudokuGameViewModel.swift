@@ -1220,6 +1220,7 @@ class SudokuGameViewModel: ObservableObject {
     enum CellHighlightType {
         case selected       // The exact cell selected
         case sameValue      // Same value as selected cell
+        case sameNote       // Shares the same note or has note that matches selected value
         case relating       // Same Box (or other minor relation)
         case none
     }
@@ -1235,8 +1236,12 @@ class SudokuGameViewModel: ObservableObject {
              if val != 0 && val == explicit {
                  return .sameValue
              }
-             // No neighborhood highlighting for explicit number mode
-             return .none
+
+             // If it's a pure explicit highlight (1 or 0 cells selected), stop here.
+             // If multiple cells are selected, allow it to fall through to the intersection logic!
+             if selectedIndices.count <= 1 {
+                 return .none
+             }
         }
         
         // 3. Logic based on PRIMARY selected intent (selectedCellIndex as active anchor)
@@ -1253,6 +1258,8 @@ class SudokuGameViewModel: ObservableObject {
                     let currentValue = getValueAt(index)
                     if currentValue != 0 && currentValue == selectedValue {
                         return .sameValue
+                    } else if currentValue == 0 && cells[index].notes.contains(selectedValue) {
+                        return .sameNote
                     }
                 }
             } else {
@@ -1264,7 +1271,7 @@ class SudokuGameViewModel: ObservableObject {
                          
                          // If the selected cell has notes, and the current cell shares at least one note
                          if !anchorNotes.isEmpty && !anchorNotes.isDisjoint(with: currentNotes) {
-                             return .relating // Use relating (subtle) for shared notes
+                             return .sameNote // Distinct color for shared notes
                          }
                      }
                  }
@@ -1282,7 +1289,7 @@ class SudokuGameViewModel: ObservableObject {
         
         // Standard "Restriction" style (Neighborhood + Same Value)
         
-        if mode == .potential {
+        if mode == .potential && selectedIndices.count <= 1 {
              // POTENTIAL MODE (If enabled in settings)
              if selectedIndices.count == 1 && selectedValue != 0 {
                 let digit = selectedValue

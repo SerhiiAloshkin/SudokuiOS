@@ -212,11 +212,17 @@ struct SudokuGameView: View {
         
         private var overlayColor: Color? {
             switch highlightType {
-            case .selected, .sameValue:
-                // Increase opacity by 15% for Light Mode (0.4 -> 0.55)
-                return colorScheme == .light ? Color.blue.opacity(0.55) : Color("SelectionHighlight").opacity(0.4)
+            case .selected:
+                // Strong, unique color for actively selected cell(s)
+                return colorScheme == .light ? Color.blue.opacity(0.7) : Color("SelectionHighlight").opacity(0.65)
+            case .sameValue:
+                // Lighter distinct background for matching numbers
+                return colorScheme == .light ? Color.blue.opacity(0.35) : Color("SelectionHighlight").opacity(0.3)
+            case .sameNote:
+                // Brand new Versa-style distinct color for note overlaps
+                return colorScheme == .light ? Color.purple.opacity(0.35) : Color.purple.opacity(0.4)
             case .relating:
-                // Increase opacity by 15% for Light Mode (0.35 -> 0.50)
+                // Neighborhood/Restriction Highlight
                 return Color("RestrictionHighlight").opacity(colorScheme == .light ? 0.50 : 0.35)
             case .none:
                 return nil
@@ -228,12 +234,6 @@ struct SudokuGameView: View {
                 // 1. Background
                 Rectangle()
                     .fill(baseColor)
-                
-                // 1.5 Note Highlight
-                if isNoteHighlightEnabled, cell.value == 0, let digit = highlightedDigit, cell.notes.contains(digit) {
-                    Rectangle()
-                        .fill(colorScheme == .light ? Color.blue.opacity(0.4) : Color("SelectionHighlight").opacity(0.4))
-                }
                 
                 // 2. Highlight Overlay
                 if let overlay = overlayColor {
