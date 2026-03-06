@@ -2030,7 +2030,6 @@ class SudokuGameViewModel: ObservableObject {
         }
         
         var errors: Set<KropkiBorder> = []
-        let currentString = currentBoard
         let wDots = whiteDots ?? []
         let bDots = blackDots ?? []
         
