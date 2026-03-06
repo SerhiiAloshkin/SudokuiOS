@@ -175,12 +175,17 @@ class SudokuGameViewModel: ObservableObject {
     
     @Published var kropkiErrors: Set<KropkiBorder> = []
     
-    // Palette
+    // Palette (Versa Style - 9 Curated Pastel Colors)
     static let palette: [Color] = [
-        Color.red.opacity(0.3), Color.orange.opacity(0.3), Color.yellow.opacity(0.3),
-        Color.green.opacity(0.3), Color.mint.opacity(0.3), Color.teal.opacity(0.3),
-        Color.cyan.opacity(0.3), Color.blue.opacity(0.3), Color.indigo.opacity(0.3),
-        Color.purple.opacity(0.3), Color.pink.opacity(0.3), Color.brown.opacity(0.3)
+        Color(hex: "#FFB3BA"), // Pastel Red/Pink
+        Color(hex: "#FFDFBA"), // Pastel Orange
+        Color(hex: "#FFFFBA"), // Pastel Yellow
+        Color(hex: "#B8F2E6"), // Pastel Mint
+        Color(hex: "#BAE1FF"), // Pastel Blue
+        Color(hex: "#E2CBF7"), // Pastel Purple
+        Color(hex: "#F5D5CB"), // Pastel Peach
+        Color(hex: "#D0F4DE"), // Pastel Green
+        Color(hex: "#E2E2E2")  // Pastel Gray/Silver
     ]
     
     var cellCrosses: [Int: Bool] = [:] // Temporary storage during init
@@ -1233,8 +1238,17 @@ class SudokuGameViewModel: ObservableObject {
         // 2. Logic based on Explicit Highlight (No Anchor needed)
         if let explicit = explicitHighlightedDigit {
              let val = getValueAt(index)
+             
+             // Highlight matching numbers
              if val != 0 && val == explicit {
                  return .sameValue
+             }
+             
+             // Highlight matching notes
+             if val == 0 && (settings?.isHighlightSameNoteEnabled ?? true) {
+                 if cells[index].notes.contains(explicit) {
+                     return .sameNote
+                 }
              }
 
              // If it's a pure explicit highlight (1 or 0 cells selected), stop here.

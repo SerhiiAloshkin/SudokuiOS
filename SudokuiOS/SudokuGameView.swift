@@ -204,7 +204,7 @@ struct SudokuGameView: View {
         
         // Computed properties to simplify body
         private var baseColor: Color {
-            if let userColorIndex = cell.color {
+            if let userColorIndex = cell.color, userColorIndex >= 0, userColorIndex < SudokuGameViewModel.palette.count {
                 return SudokuGameViewModel.palette[userColorIndex]
             }
             return Color.clear // Ensure default is transparent to show underlying layers

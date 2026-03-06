@@ -129,7 +129,7 @@ struct LevelPreviewBoard: View {
                                 let val = cellValues[index]
                                 let notes = cellNotes[index] ?? []
                                 let colorIdx = cellColors[index]
-                                let color = colorIdx != nil ? SudokuGameViewModel.palette[colorIdx!] : nil
+                                let color = (colorIdx != nil && colorIdx! >= 0 && colorIdx! < SudokuGameViewModel.palette.count) ? SudokuGameViewModel.palette[colorIdx!] : nil
                                 let isClue = isClue(at: index)
                                 let hasCross = cellCrosses[index] ?? false
                                 
