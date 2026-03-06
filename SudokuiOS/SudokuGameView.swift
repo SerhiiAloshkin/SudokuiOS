@@ -536,6 +536,9 @@ struct SudokuGameView: View {
                         }
                         .frame(width: 50, height: 50)
                     }
+                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                        gameViewModel.toggleSelectAllEmptyCells()
+                    })
                     
                     Spacer()
                     
@@ -608,6 +611,9 @@ struct SudokuGameView: View {
                             }
                             .frame(width: 50, height: 50)
                         }
+                        .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                            gameViewModel.toggleCrossAllEmptyCells()
+                        })
                         Spacer()
                     }
                     

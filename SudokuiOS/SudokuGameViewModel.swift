@@ -537,6 +537,31 @@ class SudokuGameViewModel: ObservableObject {
         isMultiSelectMode.toggle()
     }
     
+    func toggleSelectAllEmptyCells() {
+        let emptyIndices = cells.filter { $0.value == 0 }.map { $0.id }
+        guard !emptyIndices.isEmpty else { return }
+        
+        let allEmptySelected = emptyIndices.allSatisfy { selectedIndices.contains($0) }
+        
+        if allEmptySelected {
+            for index in emptyIndices {
+                selectedIndices.remove(index)
+                if selectedCellIndex == index {
+                    selectedCellIndex = nil
+                }
+            }
+        } else {
+            isMultiSelectMode = true
+            for index in emptyIndices {
+                selectedIndices.insert(index)
+            }
+            selectedCellIndex = emptyIndices.last
+        }
+        
+        updateRestrictions()
+        triggerHaptic()
+    }
+    
     func setCellColor(_ paletteIndex: Int) {
         let batchID = selectedIndices.count > 1 ? UUID() : nil
         
@@ -600,6 +625,28 @@ class SudokuGameViewModel: ObservableObject {
             }
         }
         finishBatchUpdate()
+    }
+    
+    func toggleCrossAllEmptyCells() {
+        let emptyIndices = cells.filter { $0.value == 0 }.map { $0.id }
+        guard !emptyIndices.isEmpty else { return }
+        
+        let batchID = UUID()
+        let shouldAdd = emptyIndices.contains { !cells[$0].hasCross }
+        
+        for index in emptyIndices {
+            let cell = cells[index]
+            if cell.hasCross != shouldAdd {
+                let oldValue = cell.hasCross ? "true" : "false"
+                let newValue = shouldAdd ? "true" : "false"
+                
+                addMove(cellIndex: index, moveType: "Cross", oldValue: oldValue, newValue: newValue, batchID: batchID, performSave: false)
+                
+                cell.hasCross = shouldAdd
+            }
+        }
+        finishBatchUpdate()
+        triggerHaptic()
     }
     
     func erase() {
