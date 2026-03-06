@@ -116,7 +116,7 @@ struct SudokuGameView: View {
             //   .presentationDetents([.medium])
         }
         .sheet(isPresented: $gameViewModel.isRulesPresented) {
-            RulesView(ruleType: gameViewModel.ruleType ?? .classic, isNegative: gameViewModel.negativeConstraint)
+            RulesView(ruleTypes: gameViewModel.rules.isEmpty ? [.classic] : gameViewModel.rules, isNegative: gameViewModel.negativeConstraint)
         }
         .navigationTitle("")
         .navigationTitle("")

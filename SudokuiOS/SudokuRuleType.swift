@@ -20,46 +20,65 @@ enum SudokuRuleType: String, Codable, CaseIterable {
         self = SudokuRuleType.from(string: rawString)
     }
     
-    // Helper for manual initialization from loose strings
+    // Helper for manual initialization from loose strings (Legacy single-return)
     static func from(string: String?) -> SudokuRuleType {
-        guard let raw = string?.lowercased() else { return .classic }
+        let rules = allRules(from: string)
+        return rules.first ?? .classic
+    }
+    
+    // Parses and returns ALL valid rule types from a comma-separated string, removing duplicates
+    static func allRules(from string: String?) -> [SudokuRuleType] {
+        guard let raw = string?.lowercased() else { return [.classic] }
         
         let parts = raw.components(separatedBy: ",")
+        var results: [SudokuRuleType] = []
         
-        // First Priority: Heavy variant rules (determines the display name)
+        // 1. Parse Heavy Variant Rules
         for part in parts {
             let cleanPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
             switch cleanPart {
-            case "sandwich": return .sandwich
-            case "arrow": return .arrow
-            case "thermo": return .thermo
-            case "killer": return .killer
-            case "kropki": return .kropki
-            case "odd-even", "odd_even": return .oddEven
-            case "knight", "knights_move", "knight_sudoku": return .knight
-            case "king", "kings_move", "king_sudoku": return .king
+            case "sandwich": results.append(.sandwich)
+            case "arrow": results.append(.arrow)
+            case "thermo": results.append(.thermo)
+            case "killer": results.append(.killer)
+            case "kropki": results.append(.kropki)
+            case "odd-even", "odd_even": results.append(.oddEven)
+            case "knight", "knights_move", "knight_sudoku": results.append(.knight)
+            case "king", "kings_move", "king_sudoku": results.append(.king)
             default: continue
             }
         }
         
-        // Second Priority: modifiers like non-consecutive
+        // 2. Parse Modifiers
         for part in parts {
             let cleanPart = part.trimmingCharacters(in: .whitespacesAndNewlines)
             if cleanPart == "non-consecutive" || cleanPart == "non_consecutive" {
-                return .nonConsecutive
+                results.append(.nonConsecutive)
             }
         }
         
-        if raw == "variant" {
-            return .classic
+        // 3. Fallbacks
+        if results.isEmpty {
+            if raw == "variant" || parts.contains("classic") {
+                results.append(.classic)
+            } else {
+                print("WARNING: Unknown rule type(s) '\(raw)', defaulting to classic.")
+                results.append(.classic)
+            }
         }
         
-        if parts.contains("classic") {
-            return .classic
+        // Filter duplicates while preserving order
+        var uniqueResults: [SudokuRuleType] = []
+        var seen = Set<SudokuRuleType>()
+        
+        for rule in results {
+            if !seen.contains(rule) {
+                seen.insert(rule)
+                uniqueResults.append(rule)
+            }
         }
-            
-        print("WARNING: Unknown rule type '\(raw)', defaulting to classic.")
-        return .classic
+        
+        return uniqueResults
     }
     
     // Helper to get display name

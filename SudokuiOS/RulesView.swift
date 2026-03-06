@@ -4,10 +4,15 @@ struct RulesView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(AppSettings.self) var settings // Inject Settings from Environment
     
-    let ruleType: SudokuRuleType
+    let ruleTypes: [SudokuRuleType]
     var isNegative: Bool = false
     
     @State private var currentTab = 0
+    
+    // Computed property for all valid variant rules (excluding classic)
+    private var variantRules: [SudokuRuleType] {
+        ruleTypes.filter { $0 != .classic }
+    }
     
     var body: some View {
         NavigationStack {
@@ -17,15 +22,15 @@ struct RulesView: View {
                     .tag(0)
                 
                 // 2. Specific Variant Rules (If applicable)
-                if ruleType != .classic {
-                    StaticRuleCardView(ruleType: ruleType)
-                        .tag(1)
-                    
-                    // 3. Negative Constraint Page (Conditional)
-                    if ruleType == .kropki && isNegative {
-                        StaticRuleCardView(ruleType: .kropki, isNegativeExplanation: true)
-                            .tag(2)
-                    }
+                ForEach(Array(variantRules.enumerated()), id: \.offset) { index, variant in
+                    StaticRuleCardView(ruleType: variant)
+                        .tag(index + 1) // Offset tags by 1 (Classic is 0)
+                }
+                
+                // 3. Negative Constraint Page (Conditional)
+                if ruleTypes.contains(.kropki) && isNegative {
+                    StaticRuleCardView(ruleType: .kropki, isNegativeExplanation: true)
+                        .tag(variantRules.count + 1) // Place after all variants
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
@@ -51,9 +56,12 @@ struct RulesView: View {
     
     // Computed property for total pages
     var pageCount: Int {
-        if ruleType == .classic { return 1 }
-        if ruleType == .kropki && isNegative { return 3 }
-        return 2
+        var count = 1 // Always classic
+        count += variantRules.count
+        if ruleTypes.contains(.kropki) && isNegative {
+            count += 1
+        }
+        return count
     }
     
     // Overlay for Navigation Arrows
@@ -863,7 +871,7 @@ struct ThermoPathView: View {
 }
 
 #Preview {
-    RulesView(ruleType: .nonConsecutive)
+    RulesView(ruleTypes: [.nonConsecutive])
 }
 
 struct OddEvenShapeView: View {
