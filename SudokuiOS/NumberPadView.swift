@@ -1,8 +1,12 @@
 import SwiftUI
 
 struct NumberPadView: View {
+    var completedDigits: Set<Int>
+    var isSandwich: Bool = false
+    
     // Action closure: passes the number tapped (1-9), or 0 for clear/delete
     var action: (Int) -> Void
+    var action19: (() -> Void)? = nil
     
     // Config
     private let spacing: CGFloat = 4
@@ -15,15 +19,22 @@ struct NumberPadView: View {
             // but we use available width. We can deduct a small margin if we want internal spacing.
             // Let's deduct same margin as before to be safe if it's edge-to-edge.
             let totalMargin = horizontalMargin * 2
-            let totalSpacing = spacing * 8
+            let buttonCount: CGFloat = isSandwich ? 10.0 : 9.0
+            let totalSpacing = spacing * (buttonCount - 1)
             
-            let buttonSize = (width - totalMargin - totalSpacing) / 9.0
+            let buttonSize = (width - totalMargin - totalSpacing) / buttonCount
             let safeButtonSize = max(0, buttonSize)
             
             HStack(spacing: spacing) {
                 ForEach(1...9, id: \.self) { number in
-                    NumberButton(number: number, size: safeButtonSize) {
+                    NumberButton(number: number, isCompleted: completedDigits.contains(number), size: safeButtonSize) {
                         action(number)
+                    }
+                }
+                
+                if isSandwich {
+                    Button19(size: safeButtonSize) {
+                        action19?()
                     }
                 }
             }
@@ -35,6 +46,7 @@ struct NumberPadView: View {
 
 struct NumberButton: View {
     let number: Int
+    let isCompleted: Bool
     let size: CGFloat
     var action: () -> Void
     
@@ -49,6 +61,8 @@ struct NumberButton: View {
                 .cornerRadius(size * 0.2) // Proportional corner radius
         }
         .buttonStyle(ScaleButtonStyle())
+        .opacity(isCompleted ? 0.3 : 1.0)
+        .disabled(isCompleted)
     }
 }
 
@@ -58,5 +72,23 @@ struct ScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+struct Button19: View {
+    let size: CGFloat
+    var action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text("19")
+                .font(.system(size: size * 0.45, weight: .bold, design: .rounded)) // Smaller font for 19
+                .minimumScaleFactor(0.5)
+                .foregroundColor(.blue)
+                .frame(width: size, height: size)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(size * 0.2) // Proportional corner radius
+        }
+        .buttonStyle(ScaleButtonStyle())
     }
 }

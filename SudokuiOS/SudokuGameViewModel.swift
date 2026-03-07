@@ -64,6 +64,9 @@ class SudokuGameViewModel: ObservableObject {
     // Explicit Highlight (Number Pad Toggle)
     @Published var explicitHighlightedDigit: Int? = nil
     
+    // Completed Digits Tracking
+    @Published var completedDigits: Set<Int> = []
+    
     func selectClue(index: Int, isRow: Bool, sum: Int) {
         let id = isRow ? "Row-\(index)" : "Col-\(index)"
         
@@ -338,6 +341,7 @@ class SudokuGameViewModel: ObservableObject {
             newCells.append(SudokuCellModel(id: i, value: val, notes: n, color: c, hasCross: cross, isClue: clue))
         }
         self.cells = newCells
+        recalculateCompletedDigits()
         
         // Sync back fixed board to currentBoard string immediately to fix save state
         var boardArr = [Int](repeating: 0, count: 81)
@@ -814,7 +818,28 @@ class SudokuGameViewModel: ObservableObject {
     }
     
     
+    private func recalculateCompletedDigits() {
+        var counts = [Int: Int]()
+        for cell in cells {
+            if cell.value != 0 {
+                counts[cell.value, default: 0] += 1
+            }
+        }
+        
+        var completed = Set<Int>()
+        for digit in 1...9 {
+            if counts[digit, default: 0] == 9 {
+                completed.insert(digit)
+            }
+        }
+        
+        if self.completedDigits != completed {
+            self.completedDigits = completed
+        }
+    }
+    
     private func finishBatchUpdate(checkWin: Bool = false, wasBoardFull: Bool = false) {
+        recalculateCompletedDigits()
         saveState()
         parentViewModel.modelContext?.processPendingChanges()
         // boardID = UUID() // REMOVED: Do not force full grid redraw. @Observable cells handle updates.
@@ -909,6 +934,66 @@ class SudokuGameViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    @MainActor
+    func didTap19() {
+        if selectedCellIndex == nil && selectedIndices.isEmpty {
+            return // Ignore if no cell is selected, as "19" is a multi-digit note action.
+        }
+        
+        let batchID = UUID()
+        let validIndices = selectedIndices.filter { cells[$0].value == 0 }
+        
+        guard !validIndices.isEmpty else { return }
+        
+        // Context Check for each valid cell
+        var cellsContext: [(index: Int, canPlace1: Bool, canPlace9: Bool)] = []
+        for index in validIndices {
+            cellsContext.append((
+                index: index,
+                canPlace1: isValid(1, at: index, ignoring: -1),
+                canPlace9: isValid(9, at: index, ignoring: -1)
+            ))
+        }
+        
+        // Determine whether to Add or Remove globally for the batch
+        // If ANY valid cell is missing a *possible* 1 or 9, we ADD
+        let shouldAdd = cellsContext.contains { ctx in
+            let cell = cells[ctx.index]
+            let missing1 = ctx.canPlace1 && !cell.notes.contains(1)
+            let missing9 = ctx.canPlace9 && !cell.notes.contains(9)
+            return missing1 || missing9
+        }
+        
+        for ctx in cellsContext {
+            let cell = cells[ctx.index]
+            
+            var currentNotes = cell.notes
+            let oldNotesString = currentNotes.sorted().map{String($0)}.joined(separator: ",")
+            
+            if shouldAdd {
+                if ctx.canPlace1 { currentNotes.insert(1) }
+                if ctx.canPlace9 { currentNotes.insert(9) }
+            } else {
+                if ctx.canPlace1 { currentNotes.remove(1) }
+                if ctx.canPlace9 { currentNotes.remove(9) }
+            }
+            
+            // Routinely clear out impossible notes just in case
+            if !ctx.canPlace1 { currentNotes.remove(1) }
+            if !ctx.canPlace9 { currentNotes.remove(9) }
+            
+            let newNotesString = currentNotes.sorted().map{String($0)}.joined(separator: ",")
+            
+            if oldNotesString != newNotesString {
+                cell.notes = currentNotes
+                addMove(cellIndex: ctx.index, moveType: "Note", oldValue: oldNotesString, newValue: newNotesString, batchID: batchID, performSave: false)
+            }
+        }
+        
+        finishBatchUpdate()
+        self.objectWillChange.send() // Trigger UI Pulse
     }
     
     @MainActor

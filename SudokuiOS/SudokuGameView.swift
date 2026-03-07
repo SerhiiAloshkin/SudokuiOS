@@ -672,8 +672,10 @@ struct SudokuGameView: View {
                     .padding(.bottom, 8)
                 
                 // Number Pad
-                NumberPadView { number in
+                NumberPadView(completedDigits: gameViewModel.completedDigits, isSandwich: gameViewModel.rules.contains(.sandwich)) { number in
                     gameViewModel.didTapNumber(number)
+                } action19: {
+                    gameViewModel.didTap19()
                 }
                 .padding(.horizontal, 4) // Matches NumberPadView's calculated margin
                 .padding(.bottom, 10) // Bottom padding for home indicator visual space
