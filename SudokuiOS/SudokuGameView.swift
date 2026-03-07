@@ -213,18 +213,15 @@ struct SudokuGameView: View {
         private var overlayColor: Color? {
             switch highlightType {
             case .selected:
-                // Strong, unique color for actively selected cell(s)
                 return colorScheme == .light ? Color.blue.opacity(0.7) : Color("SelectionHighlight").opacity(0.65)
             case .sameValue:
-                // Lighter distinct background for matching numbers
                 return colorScheme == .light ? Color.blue.opacity(0.35) : Color("SelectionHighlight").opacity(0.3)
             case .sameNote:
-                // Brand new Versa-style distinct color for note overlaps
-                return colorScheme == .light ? Color.purple.opacity(0.35) : Color.purple.opacity(0.4)
+                // Sleek, Versa-style Teal that doesn't clash with the Color button palette
+                return colorScheme == .light ? Color.teal.opacity(0.25) : Color.teal.opacity(0.3)
             case .relating:
-                // Neighborhood/Restriction Highlight
                 return Color("RestrictionHighlight").opacity(colorScheme == .light ? 0.50 : 0.35)
-            case .none:
+            case .sameNoteAndRelating, .none:
                 return nil
             }
         }
@@ -236,7 +233,13 @@ struct SudokuGameView: View {
                     .fill(baseColor)
                 
                 // 2. Highlight Overlay
-                if let overlay = overlayColor {
+                if highlightType == .sameNoteAndRelating {
+                    // Render BOTH overlays to physically merge the colors
+                    Rectangle()
+                        .fill(Color("RestrictionHighlight").opacity(colorScheme == .light ? 0.50 : 0.35))
+                    Rectangle()
+                        .fill(colorScheme == .light ? Color.teal.opacity(0.25) : Color.teal.opacity(0.3))
+                } else if let overlay = overlayColor {
                     Rectangle()
                         .fill(overlay)
                 }

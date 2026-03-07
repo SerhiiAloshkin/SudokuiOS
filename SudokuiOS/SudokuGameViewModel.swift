@@ -1227,6 +1227,7 @@ class SudokuGameViewModel: ObservableObject {
         case sameValue      // Same value as selected cell
         case sameNote       // Shares the same note or has note that matches selected value
         case relating       // Same Box (or other minor relation)
+        case sameNoteAndRelating // NEW: Represents a cell that has a matching note AND is restricted/potential
         case none
     }
     
@@ -1234,6 +1235,8 @@ class SudokuGameViewModel: ObservableObject {
         if selectedIndices.contains(index) {
             return .selected
         }
+        
+        var isSameNoteMatch = false // MUST BE AT THE TOP
         
         // 2. Logic based on Explicit Highlight (No Anchor needed)
         if let explicit = explicitHighlightedDigit {
@@ -1249,24 +1252,23 @@ class SudokuGameViewModel: ObservableObject {
              // Highlight matching notes
              if val == 0 && (settings?.isHighlightSameNoteEnabled ?? true) {
                  if cells[index].notes.contains(explicit) {
-                     return .sameNote
+                     isSameNoteMatch = true // Set flag, do not return yet!
                  }
              }
 
              // If it's a pure explicit highlight (1 or 0 cells selected), stop here.
              // If multiple cells are selected, allow it to fall through to the intersection logic!
              if selectedIndices.count <= 1 {
-                 return .none
+                 return isSameNoteMatch ? .sameNote : .none
              }
         }
         
-        // 3. Logic based on PRIMARY selected intent (selectedCellIndex as active anchor)
-        guard let anchor = selectedCellIndex else { return .none }
+        var selectedValue: Int = 0
+        if let anchor = selectedCellIndex, anchor < cells.count {
+             selectedValue = cells[anchor].value
+        }
         
-        let selectedValue = getValueAt(anchor)
-        
-        // GLOBAL HIGHLIGHTS (Applied regardless of Minimal/Restriction/Potential Mode)
-        
+        // Single Selection specific logic
         if selectedIndices.count == 1 {
             // a) Same Digit
             if selectedValue != 0 {
@@ -1278,19 +1280,19 @@ class SudokuGameViewModel: ObservableObject {
                     }
                 } else if currentValue == 0 && cells[index].notes.contains(selectedValue) {
                     if settings?.isHighlightSameNoteEnabled ?? true {
-                        return .sameNote
+                        isSameNoteMatch = true
                     }
                 }
             } else {
                  // b) Check for Note Highlighting (If selected cell is empty and has notes)
                  if settings?.isHighlightSameNoteEnabled ?? true {
-                     if index != anchor && index < cells.count && anchor < cells.count {
+                     if let anchor = selectedCellIndex, index != anchor && index < cells.count && anchor < cells.count {
                          let anchorNotes = cells[anchor].notes
                          let currentNotes = cells[index].notes
                          
                          // If the selected cell has notes, and the current cell shares at least one note
                          if !anchorNotes.isEmpty && !anchorNotes.isDisjoint(with: currentNotes) {
-                             return .sameNote // Distinct color for shared notes
+                             isSameNoteMatch = true // Set flag, do not return yet
                          }
                      }
                  }
@@ -1299,103 +1301,55 @@ class SudokuGameViewModel: ObservableObject {
         
         // If Minimal Mode is ON, we STOP here (no Neighborhood/Potential highlights)
         if settings?.isMinimalHighlight ?? true {
-            return .none
+            return isSameNoteMatch ? .sameNote : .none
         }
         
         let mode = settings?.highlightMode ?? .restriction // Use Setting mainly for 'Potential' vs 'Restriction' style neighborhood
         
         // 3. Logic based on Mode (Non-Minimal)
-        
-        // Standard "Restriction" style (Neighborhood + Same Value)
-        
         if mode == .potential && selectedIndices.count <= 1 {
-             // POTENTIAL MODE (If enabled in settings)
-             if selectedIndices.count == 1 && selectedValue != 0 {
+            // POTENTIAL MODE (If enabled in settings)
+            if selectedIndices.count == 1 && selectedValue != 0 {
                 let digit = selectedValue
-                let currentValue = getValueAt(index)
+                let cellValue = getValueAt(index)
                 
-                if currentValue == 0 {
-                    if isValid(digit, at: index, ignoring: -1) {
-                         // Refined Logic (Non-Consecutive Potential)
-                         // Check global property first or if rules contains .nonConsecutive
-                         if isNonConsecutive || rules.contains(.nonConsecutive) {
-                             if hasConsecutiveNeighbor(at: index, value: digit) {
-                                 // Valid by Sudoku rules, but violates N±1
-                                 return .none
-                             }
-                         }
-                        
-                        // Refined Logic (Odd-Even Potential)
-                        if rules.contains(.oddEven), let parityString = parityOverlay, index < parityString.count {
-                             let parityChar = parityString[parityString.index(parityString.startIndex, offsetBy: index)]
-                             if parityChar == "1" && digit % 2 == 0 { return .none } // Odd cell: cannot place Even
-                             if parityChar == "2" && digit % 2 != 0 { return .none } // Even cell: cannot place Odd
-                        }
-                        
-                        // KNIGHT Constraint
-                        if rules.contains(.knight) {
-                            if hasKnightConflict(at: index, value: digit) { return .none }
-                        }
-                        
-                        // KING Constraint
-                        if rules.contains(.king) {
-                            if hasKingConflict(at: index, value: digit) { return .none }
-                        }
-                        
-                        // KROPKI Constraint
-                        if rules.contains(.kropki) {
-                            if hasKropkiConflict(at: index, value: digit) { return .none }
-                        }
-                        
-                        // THERMO Constraint
-                        if rules.contains(.thermo) {
-                            if hasThermoConflict(at: index, value: digit) { return .none }
-                        }
-                        
-                        // ARROW Constraint
-                        if rules.contains(.arrow) {
-                            if hasArrowConflict(at: index, value: digit) { return .none }
-                        }
-                        
-                        // KILLER Constraint
-                        if rules.contains(.killer) {
-                            if hasKillerConflict(at: index, value: digit) { return .none }
-                        }
-                        
-                        // Line-Box / Pointing Pairs Restriction
-                        if pointPairRestrictions.contains(index) {
-                            return .none
-                        }
-                        
-                        
-                        if restrictedHighlightSet.contains(index) {
-                            return .none
-                        }
-                        
-                        return .relating // Potential spot
+                if cellValue == 0 {
+                    if !isValid(digit, at: index, ignoring: -1) { return isSameNoteMatch ? .sameNote : .none }
+                    if isNonConsecutive || rules.contains(.nonConsecutive) {
+                        if hasConsecutiveNeighbor(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
                     }
+                    if rules.contains(.kropki) {
+                        if hasKropkiConflict(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
+                    }
+                    if rules.contains(.thermo) {
+                        if hasThermoConflict(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
+                    }
+                    if rules.contains(.arrow) {
+                        if hasArrowConflict(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
+                    }
+                    if rules.contains(.killer) {
+                        if hasKillerConflict(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
+                    }
+                    if pointPairRestrictions.contains(index) { return isSameNoteMatch ? .sameNote : .none }
+                    if restrictedHighlightSet.contains(index) { return isSameNoteMatch ? .sameNote : .none }
+                    
+                    return isSameNoteMatch ? .sameNoteAndRelating : .relating // Potential spot
                 }
-                // Same Value check moved up
-            } else {
-                 // Empty Cell in Potential Mode:
-                 return .none
             }
         } else {
             // STANDARD / RESTRICTION (Legacy Default)
-            
-            // b) Neighborhood (Row, Col, Box) - Intersection for multi-select
-            guard !selectedIndices.isEmpty else { return .none }
+            guard !selectedIndices.isEmpty else { return isSameNoteMatch ? .sameNote : .none }
             
             let isRestrictedByAll = selectedIndices.allSatisfy { selectedIndex in
                 isSameNeighborhood(index1: selectedIndex, index2: index)
             }
             
             if isRestrictedByAll {
-                return .relating
+                return isSameNoteMatch ? .sameNoteAndRelating : .relating
             }
         }
         
-        return .none
+        return isSameNoteMatch ? .sameNote : .none
     }
     
     func isOrthogonalNeighbor(index1: Int, index2: Int) -> Bool {
