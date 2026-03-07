@@ -542,10 +542,14 @@ struct SudokuGameView: View {
                         }
                     }
                     
-                    if let variant = gameViewModel.ruleType?.displayName {
-                        Text(variant)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.secondary)
+                    if !gameViewModel.rules.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(gameViewModel.rules, id: \.self) { rule in
+                                VariantTagView(rule: rule)
+                            }
+                        }
+                    } else if let variant = gameViewModel.ruleType {
+                        VariantTagView(rule: variant)
                     }
                 }
                 
@@ -566,8 +570,40 @@ struct SudokuGameView: View {
             .padding(.top, 10)
         }
     }
+    
+    struct VariantTagView: View {
+        let rule: SudokuRuleType
+        
+        var body: some View {
+            HStack(spacing: 4) {
+                if rule == .kropki {
+                    HStack(spacing: 1) {
+                        Image(systemName: "circle.fill").font(.system(size: 6))
+                        Image(systemName: "circle").font(.system(size: 6))
+                    }
+                } else if rule == .knight {
+                    Image("knight_icon")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 10, height: 10)
+                } else {
+                    Image(systemName: rule.iconName)
+                        .font(.system(size: 10, weight: .bold))
+                }
+                
+                Text(rule.shortName.uppercased())
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color.blue.opacity(0.1))
+            .foregroundColor(.blue)
+            .cornerRadius(4)
+        }
+    }
             
-            struct SudokuControlsView: View {
+    struct SudokuControlsView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
         @Binding var showColorPicker: Bool
         @Environment(AppSettings.self) var settings

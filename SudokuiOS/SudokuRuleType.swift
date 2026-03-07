@@ -97,6 +97,22 @@ enum SudokuRuleType: String, Codable, CaseIterable {
         }
     }
     
+    // Helper for concise labels
+    var shortName: String {
+        switch self {
+        case .classic: return "Classic"
+        case .sandwich: return "Sandwich"
+        case .arrow: return "Arrow"
+        case .thermo: return "Thermo"
+        case .killer: return "Killer"
+        case .nonConsecutive: return "Non-Cons"
+        case .kropki: return "Kropki"
+        case .oddEven: return "Odd/Even"
+        case .knight: return "Knight"
+        case .king: return "King"
+        }
+    }
+    
     // Helper for icons (Centralized)
     var iconName: String {
         switch self {
