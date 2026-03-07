@@ -809,7 +809,13 @@ class HumanLogicSolver:
             if process_sandwich([(r, c) for r in range(9)], col_clues[c]): changed = True
         return changed
 
-    def solve(self):
+    def solve(self, output_mode='full'):
+        output_buffer = []
+        def log(msg):
+            if output_mode == 'full':
+                print(msg)
+            elif output_mode == 'unsolved':
+                output_buffer.append(msg)
         pass_num = 1
         while True:
             changed = False
@@ -827,17 +833,27 @@ class HumanLogicSolver:
             if self._apply_sandwich_rules(): changed = True
             
             resolved_count = sum(1 for r in range(9) for c in range(9) if len(self.candidates[r][c]) == 1)
-            print(f"Pass {pass_num}: {resolved_count}/81 cells resolved.")
+            log(f"Pass {pass_num}: {resolved_count}/81 cells resolved.")
             
             if resolved_count == 81:
-                print("✅ HUMAN SOLVABLE: Solved entirely by logic!")
-                self.print_board()
+                log("✅ HUMAN SOLVABLE: Solved entirely by logic!")
+                if output_mode == 'full':
+                    self.print_board()
                 return True
             
             if not changed:
-                print("❌ REQUIRES GUESSING: Got stuck. Not human-solvable with basic constraints.")
-                print("Stuck board state:")
-                self.print_board()
+                if output_mode == 'unsolved':
+                    print(f"\n==========================================")
+                    print(f"Testing Level {self.level_data['id']} (Rules: {self.level_data.get('ruleType', 'classic')})...")
+                    for msg in output_buffer:
+                        print(msg)
+                    print("❌ REQUIRES GUESSING: Got stuck. Not human-solvable with basic constraints.")
+                    print("Stuck board state:")
+                    self.print_board()
+                elif output_mode == 'full':
+                    print("❌ REQUIRES GUESSING: Got stuck. Not human-solvable with basic constraints.")
+                    print("Stuck board state:")
+                    self.print_board()
                 return False
                 
             pass_num += 1
@@ -856,23 +872,32 @@ class HumanLogicSolver:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python logical_solver.py [-step] <level_number> OR <start>-<end> OR all")
+        print("Usage: python logical_solver.py [-step] [-full] [-unsolved] <level_number> OR <start>-<end> OR all")
         sys.exit(1)
         
     args = sys.argv[1:]
     step_mode = False
+    output_mode = 'quiet'
+    
     if "-step" in args:
         step_mode = True
         args.remove("-step")
+        output_mode = 'full'
+        
+    if "-full" in args:
+        output_mode = 'full'
+        args.remove("-full")
+    elif "-unsolved" in args:
+        output_mode = 'unsolved'
+        args.remove("-unsolved")
         
     if not args:
         print("Error: Missing level argument.")
         sys.exit(1)
         
-    # Combine all remaining arguments to safely handle spaces (e.g. "333, 336" vs "333,336")
     raw_arg = "".join(args)
     levels_to_test = []
-    # 2. Parse the command line argument
+    
     if raw_arg.lower() == "all":
         levels_to_test = "all"
     elif "," in raw_arg:
@@ -894,40 +919,59 @@ if __name__ == "__main__":
         except ValueError:
             print("Error: The argument must be a valid integer, range, comma-separated list, or 'all'.")
             sys.exit(1)
-    # 3. Path to your master levels file
+            
     file_path = "SudokuiOS/Levels.json" 
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             all_levels = json.load(f)
         
-        target_levels = []
         if levels_to_test == "all":
-            target_levels = all_levels
-        else:
-            target_levels = [lvl for lvl in all_levels if lvl.get("id") in levels_to_test]
-        
-        if not target_levels:
-            print(f"Error: No levels found matching '{arg}' in {file_path}.")
-            sys.exit(1)
+            levels_to_test = [lvl.get("id") for lvl in all_levels]
+            
         success_count = 0
         fail_count = 0
+        absent_count = 0
         failed_levels = []
-        for level in target_levels:
-            print(f"\n==========================================")
-            print(f"Testing Level {level['id']} (Rules: {level.get('ruleType', 'classic')})...")
+        
+        for lvl_id in levels_to_test:
+            level = next((l for l in all_levels if l.get("id") == lvl_id), None)
+            
+            if not level:
+                absent_count += 1
+                if output_mode == 'quiet':
+                    print(f"Level {lvl_id}: Absent")
+                else:
+                    print(f"\n==========================================")
+                    print(f"Testing Level {lvl_id}...")
+                    print("❌ ABSENT: Level not found in JSON.")
+                continue
+                
+            if output_mode == 'full':
+                print(f"\n==========================================")
+                print(f"Testing Level {level['id']} (Rules: {level.get('ruleType', 'classic')})...")
+                
             solver = HumanLogicSolver(level, step_mode=step_mode)
-            if solver.solve():
+            
+            if solver.solve(output_mode=output_mode):
                 success_count += 1
+                if output_mode == 'quiet':
+                    print(f"Level {level['id']}: Solved")
             else:
                 fail_count += 1
                 failed_levels.append(level['id'])
+                if output_mode == 'quiet':
+                    print(f"Level {level['id']}: Unsolved")
+                    
         print(f"\n==========================================")
         print("BULK TESTING COMPLETE")
-        print(f"Total levels tested: {len(target_levels)}")
+        print(f"Total levels tested: {len(levels_to_test)}")
         print(f"✅ Successfully Solved: {success_count}")
         print(f"❌ Failed / Stuck: {fail_count}")
+        if absent_count > 0:
+            print(f"⚠️ Absent: {absent_count}")
         if failed_levels:
             print(f"Failed Level IDs: {failed_levels}")
         print(f"==========================================\n")
+        
     except FileNotFoundError:
         print(f"Error: Could not find the file at {file_path}. Make sure you are in the correct directory.")
