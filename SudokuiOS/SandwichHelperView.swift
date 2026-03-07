@@ -2,13 +2,14 @@ import SwiftUI
 
 struct SandwichHelperView: View {
     let sum: Int
+    let rules: [SudokuRuleType]
     let marked: Set<[Int]>
     let onToggle: ([Int]) -> Void
     let onDismiss: () -> Void
     
     // We compute combinations once on init or via computed property
     var combinations: [[Int]] {
-        SandwichMath.getSandwichCombinations(for: sum)
+        SandwichMath.getSandwichCombinations(for: sum, rules: rules)
     }
     
     var body: some View {

@@ -40,7 +40,9 @@ let package = Package(
                 "SandwichMath.swift",
                 "SandwichHelperView.swift",
                 "RulesView.swift",
-                "PointingPairsSolver.swift"
+                "PointingPairsSolver.swift",
+                "SudokuRuleType.swift",
+                "LevelVariantHelper.swift"
             ],
             resources: [
                 .process("Levels.json")

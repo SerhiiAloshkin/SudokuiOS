@@ -72,7 +72,7 @@ class SudokuGameViewModel: ObservableObject {
         
         // Auto-Selection Logic: If no state exists for this clue, select ALL valid combinations by default.
         if markedCombinations[id] == nil {
-             let allCombos = SandwichMath.getSandwichCombinations(for: sum)
+             let allCombos = SandwichMath.getSandwichCombinations(for: sum, rules: rules)
              markedCombinations[id] = Set(allCombos)
              saveState() // Instant persistence for defaults
         }

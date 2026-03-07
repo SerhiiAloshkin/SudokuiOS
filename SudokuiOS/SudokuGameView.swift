@@ -468,6 +468,7 @@ struct SudokuGameView: View {
             if let clueInfo = gameViewModel.selectedClue {
                 SandwichHelperView(
                     sum: clueInfo.sum,
+                    rules: gameViewModel.rules,
                     marked: gameViewModel.markedCombinations[clueInfo.id] ?? [],
                     onToggle: { combo in
                         gameViewModel.toggleCombination(combo)
