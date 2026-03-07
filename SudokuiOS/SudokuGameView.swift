@@ -65,6 +65,9 @@ struct SudokuGameView: View {
                 // Sandwich Helper Overlay
                 SudokuSandwichOverlayView(gameViewModel: gameViewModel)
                 
+                // Killer Helper Overlay
+                SudokuKillerOverlayView(gameViewModel: gameViewModel)
+                
                 // Victory Overlay
                 if gameViewModel.isGameComplete {
                      // Calculate Next Unsolved Level
@@ -482,37 +485,79 @@ struct SudokuGameView: View {
         }
     }
 
+
+    struct SudokuKillerOverlayView: View {
+        @ObservedObject var gameViewModel: SudokuGameViewModel
+        
+        var body: some View {
+            if gameViewModel.isKillerHelperPresented, let cage = gameViewModel.selectedCage {
+                let topLeft = cage.topLeft ?? [0,0]
+                let cageID = "\(topLeft[0]),\(topLeft[1])"
+                
+                KillerHelperView(
+                    sum: cage.sum,
+                    count: cage.cells.count,
+                    rules: gameViewModel.rules,
+                    cageCells: cage.cells,
+                    markedCombinations: gameViewModel.markedKillerCombinations[cageID] ?? [],
+                    onToggle: { combo in
+                        gameViewModel.toggleKillerCombination(combo)
+                    },
+                    onDismiss: {
+                        gameViewModel.dismissKillerHelper()
+                    }
+                )
+                .zIndex(150)
+                .transition(.opacity)
+            }
+        }
+    }
+
     struct SudokuHeaderView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
         
         var body: some View {
-                // Top Metadata Block
+            ZStack {
+                // Centered Metadata (Level + Type)
                 VStack(spacing: 4) {
                     HStack(alignment: .center, spacing: 8) {
                         Text(gameViewModel.levelTitle)
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundColor(Color("ThemeBlue"))
                         
-                        // Inline Negative Badge
                         if gameViewModel.negativeConstraint {
                             Text("NEGATIVE")
                                 .font(.system(size: 10, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.red.opacity(0.15)) // Subtle background
+                                .background(Color.red.opacity(0.15))
                                 .foregroundColor(.red)
                                 .cornerRadius(4)
                         }
                     }
                     
-                    // Variant Title
                     if let variant = gameViewModel.ruleType?.displayName {
                         Text(variant)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.secondary)
                     }
                 }
-                .padding(.top, 10)
+                
+                // Right-aligned Killer Button
+                HStack {
+                    Spacer()
+                    if let cages = gameViewModel.cages, !cages.isEmpty {
+                        Button(action: { gameViewModel.isKillerHelperPresented = true }) {
+                                Image(systemName: "list.bullet.rectangle")
+                                    .font(.system(size: 18, weight: .semibold))
+                        }
+                        .buttonStyle(VersaButtonStyle(isEnabled: gameViewModel.selectedCage != nil))
+                        .disabled(gameViewModel.selectedCage == nil)
+                        .padding(.trailing)
+                    }
+                }
+            }
+            .padding(.top, 10)
         }
     }
             
@@ -663,7 +708,6 @@ struct SudokuGameView: View {
                         }
                         .frame(width: 50, height: 50)
                     }
-                    
                     Spacer()
                 }
                 

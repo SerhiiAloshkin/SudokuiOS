@@ -1,22 +1,23 @@
 import SwiftUI
 
-struct SandwichHelperView: View {
+struct KillerHelperView: View {
     let sum: Int
+    let count: Int
     let rules: [SudokuRuleType]
-    let marked: Set<[Int]>
+    let cageCells: [[Int]]
+    let markedCombinations: Set<[Int]>
     let onToggle: ([Int]) -> Void
     let onDismiss: () -> Void
     
-    // We compute combinations once on init or via computed property
     private var combinations: [[Int]] {
-        let base = SandwichMath.getSandwichCombinations(for: sum, rules: rules)
+        let base = KillerMath.getCombinations(sum: sum, count: count, rules: rules, cageCells: cageCells)
         return base.sorted { c1, c2 in
-            let s1 = marked.contains(c1)
-            let s2 = marked.contains(c2)
+            let s1 = markedCombinations.contains(c1)
+            let s2 = markedCombinations.contains(c2)
             if s1 != s2 { return s1 } // Selected first
             
-            // Following SandwichMath's original sorting logic for the rest:
-            // 1. Length Descending
+            // Consistent tie-breaker:
+            // 1. Length Descending (usually same in Killer)
             if c1.count != c2.count { return c1.count > c2.count }
             // 2. Element-wise ascending
             for (v1, v2) in zip(c1, c2) {
@@ -38,19 +39,21 @@ struct SandwichHelperView: View {
                 
                 // 2. Main Container
                 ZStack {
-                    // Layer A: Static Background with Shadow
-                    // We separate this so it doesn't redraw when 'marked' changes
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(UIColor.systemBackground)) // Use system background for dark mode support
+                        .fill(Color(UIColor.systemBackground))
                         .shadow(radius: 20)
                     
-                    // Layer B: Dynamic Content
                     VStack(spacing: 0) {
                         // Header
                         HStack {
-                            Text("Combinations for \(sum)")
-                                .font(.headline)
-                                .foregroundColor(.primary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Killer Cage \(sum)")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Text("\(count) cells")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                             Spacer()
                             Button(action: onDismiss) {
                                 Image(systemName: "xmark.circle.fill")
@@ -59,39 +62,40 @@ struct SandwichHelperView: View {
                             }
                         }
                         .padding()
-                        .background(Color.secondary.opacity(0.1)) // Slightly lighter
+                        .background(Color.secondary.opacity(0.1))
                         
                         Divider()
                         
-                        if combinations.isEmpty && sum != 0 {
-                            Text("No combinations found.")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(40)
-                        } else if sum == 0 {
-                             Text("Adjacent 1 and 9 (Empty)")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(40)
+                        if combinations.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.title)
+                                    .foregroundColor(.orange)
+                                Text("No valid combinations")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(40)
                         } else {
-                            // Scrollable List with Max Height
                             ScrollView {
                                 VStack(spacing: 8) {
                                     ForEach(combinations, id: \.self) { combo in
-                                        CombinationRowView(combination: combo, isSelected: marked.contains(combo)) {
+                                        KillerCombinationRowView(
+                                            combination: combo,
+                                            isSelected: markedCombinations.contains(combo)
+                                        ) {
                                             onToggle(combo)
                                         }
                                     }
                                 }
                                 .padding()
                             }
-                            // Limit height to 70% of screen
                             .frame(maxHeight: geometry.size.height * 0.7)
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 16)) // Clip content to match background
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
-                .frame(width: 300) // Fixed width
+                .frame(width: 320)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding()
             }
@@ -99,7 +103,7 @@ struct SandwichHelperView: View {
     }
 }
 
-struct CombinationRowView: View {
+private struct KillerCombinationRowView: View {
     let combination: [Int]
     let isSelected: Bool
     let action: () -> Void
@@ -107,14 +111,12 @@ struct CombinationRowView: View {
     var body: some View {
         Button(action: action) {
             HStack {
-                // Number Tokens
                 ForEach(combination, id: \.self) { num in
-                    CombinationTokenView(number: num, isSelected: isSelected)
+                    KillerCombinationTokenView(number: num, isSelected: isSelected)
                 }
                 
                 Spacer()
                 
-                // Checkbox
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundColor(isSelected ? .green : .gray.opacity(0.4))
                     .font(.title2)
@@ -136,7 +138,7 @@ struct CombinationRowView: View {
     }
 }
 
-struct CombinationTokenView: View {
+private struct KillerCombinationTokenView: View {
     let number: Int
     let isSelected: Bool
     

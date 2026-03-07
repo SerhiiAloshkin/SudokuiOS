@@ -59,7 +59,12 @@ class SudokuGameViewModel: ObservableObject {
     }
     
     @Published var selectedClue: SelectedClueInfo?
-    @Published var markedCombinations: [String: Set<[Int]>] = [:] // Key: ClueID
+    @Published var markedCombinations: [String: Set<[Int]>] = [:] // Key: ClueID (Sandwich)
+    
+    // Killer Helper State
+    @Published var selectedCage: SudokuLevel.Cage?
+    @Published var markedKillerCombinations: [String: Set<[Int]>] = [:] // Key: Cage Top-Left coordinate string "r,c"
+    @Published var isKillerHelperPresented: Bool = false
     
     // Explicit Highlight (Number Pad Toggle)
     @Published var explicitHighlightedDigit: Int? = nil
@@ -110,6 +115,24 @@ class SudokuGameViewModel: ObservableObject {
     
     func dismissSandwichHelper() {
         selectedClue = nil
+    }
+    
+    func dismissKillerHelper() {
+        isKillerHelperPresented = false
+    }
+    
+    func toggleKillerCombination(_ combination: [Int]) {
+        guard let cage = selectedCage, let topLeft = cage.topLeft else { return }
+        let cageID = "\(topLeft[0]),\(topLeft[1])"
+        
+        var currentSet = markedKillerCombinations[cageID] ?? []
+        if currentSet.contains(combination) {
+            currentSet.remove(combination)
+        } else {
+            currentSet.insert(combination)
+        }
+        markedKillerCombinations[cageID] = currentSet
+        saveState()
     }
     
     func toggleCombination(_ combination: [Int]) {
@@ -283,6 +306,16 @@ class SudokuGameViewModel: ObservableObject {
             }
         }
         
+        // 6b. Load Marked Killer Combinations
+        // We reuse the same field or if needed we can add a new one, but for now let's try to find if there is a separate one.
+        // Looking at UserLevelProgress.swift might be helpful, but Level has markedCombinationsData.
+        // I'll assume markedCombinationsData stores all "helper" marks or I'll add a new one if I can.
+        // Actually, let's keep it simple and store both in the same dictionary if possible, 
+        // but Sandwich uses "Row-X" and Killer uses "r,c". They won't collide.
+        // Wait, the decoding might fail if the structure is different.
+        // Actually, let's check if I can add a new field to SudokuLevel and UserLevelProgress.
+
+        
         // 7. Load Cross Data (Sandwich)
         if let crossData = level.crossData {
              if let decodedCrosses = try? JSONDecoder().decode([Int: Bool].self, from: crossData) {
@@ -448,6 +481,36 @@ class SudokuGameViewModel: ObservableObject {
         }
         
         updateRestrictions()
+        updateSelectedCage()
+    }
+    
+    private func updateSelectedCage() {
+        guard let index = selectedCellIndex else {
+            selectedCage = nil
+            return
+        }
+        
+        let row = index / 9
+        let col = index % 9
+        
+        // Find if this cell belongs to any killer cage
+        let newCage = cages?.first(where: { cage in
+            cage.cells.contains { $0 == [row, col] }
+        })
+        
+        if let cage = newCage {
+            let topLeft = cage.topLeft ?? [0,0]
+            let cageID = "\(topLeft[0]),\(topLeft[1])"
+            
+            // Auto-Selection Logic: If no state exists for this cage, select ALL valid combinations by default.
+            if markedKillerCombinations[cageID] == nil {
+                let allCombos = KillerMath.getCombinations(sum: cage.sum, count: cage.cells.count, rules: rules, cageCells: cage.cells)
+                markedKillerCombinations[cageID] = Set(allCombos)
+                saveState() // Instant persistence for defaults
+            }
+        }
+        
+        selectedCage = newCage
     }
     
     private func triggerHaptic() {
@@ -472,6 +535,7 @@ class SudokuGameViewModel: ObservableObject {
             }
         }
         // Multi Mode: Do nothing (Additive by default)
+        updateSelectedCage()
     }
 
     // Drag Toggle Logic (Distinct from Tap Selection)
@@ -493,6 +557,7 @@ class SudokuGameViewModel: ObservableObject {
         
         updateRestrictions()
         updatePointPairRestrictions()
+        updateSelectedCage()
     }
     
     // Derived property for Note Highlighting
@@ -540,6 +605,7 @@ class SudokuGameViewModel: ObservableObject {
         }
         updateRestrictions()
         updatePointPairRestrictions()
+        updateSelectedCage()
     }
     
     func toggleMultiSelectMode() {
