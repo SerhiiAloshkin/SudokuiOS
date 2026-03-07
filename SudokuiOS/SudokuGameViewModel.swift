@@ -75,10 +75,16 @@ class SudokuGameViewModel: ObservableObject {
     func selectClue(index: Int, isRow: Bool, sum: Int) {
         let id = isRow ? "Row-\(index)" : "Col-\(index)"
         
+        // Return if helpers are disabled in settings
+        if settings?.isCombinationHelperEnabled == false {
+            return
+        }
+        
         // Auto-Selection Logic: If no state exists for this clue, select ALL valid combinations by default.
         if markedCombinations[id] == nil {
              let allCombos = SandwichMath.getSandwichCombinations(for: sum, rules: rules)
              markedCombinations[id] = Set(allCombos)
+             applyCombinationAutoFilter()
              saveState() // Instant persistence for defaults
         }
         
@@ -131,7 +137,8 @@ class SudokuGameViewModel: ObservableObject {
         } else {
             currentSet.insert(combination)
         }
-        markedKillerCombinations[cageID] = currentSet
+        markedKillerCombinations[cageID] = currentSet        
+        applyCombinationAutoFilter()
         saveState()
     }
     
@@ -146,6 +153,7 @@ class SudokuGameViewModel: ObservableObject {
         }
         markedCombinations[clueID] = currentSet
         
+        applyCombinationAutoFilter()
         // Save immediately
         saveState()
     }
@@ -158,7 +166,12 @@ class SudokuGameViewModel: ObservableObject {
     
     var levelProgress: UserLevelProgress? 
     
-    var settings: AppSettings?
+    var settings: AppSettings? {
+        didSet {
+            // When settings change, re-apply auto-filter logic
+            applyCombinationAutoFilter()
+        }
+    }
     
     func setSettings(_ settings: AppSettings) {
         // Only update if changed to avoid redundant View updates
@@ -307,13 +320,11 @@ class SudokuGameViewModel: ObservableObject {
         }
         
         // 6b. Load Marked Killer Combinations
-        // We reuse the same field or if needed we can add a new one, but for now let's try to find if there is a separate one.
-        // Looking at UserLevelProgress.swift might be helpful, but Level has markedCombinationsData.
-        // I'll assume markedCombinationsData stores all "helper" marks or I'll add a new one if I can.
-        // Actually, let's keep it simple and store both in the same dictionary if possible, 
-        // but Sandwich uses "Row-X" and Killer uses "r,c". They won't collide.
-        // Wait, the decoding might fail if the structure is different.
-        // Actually, let's check if I can add a new field to SudokuLevel and UserLevelProgress.
+        if let killerComboData = level.killerMarkedCombinationsData {
+            if let decodedKillerCombos = try? JSONDecoder().decode([String: Set<[Int]>].self, from: killerComboData) {
+                self.markedKillerCombinations = decodedKillerCombos
+            }
+        }
 
         
         // 7. Load Cross Data (Sandwich)
@@ -342,6 +353,7 @@ class SudokuGameViewModel: ObservableObject {
         
         // 6. Initialize Observable Cells
         initializeCells()
+        applyCombinationAutoFilter() // Apply filter after loading all data
     }
     
     @Published var cells: [SudokuCellModel] = []
@@ -429,9 +441,10 @@ class SudokuGameViewModel: ObservableObject {
         let notesData = try? JSONEncoder().encode(notesDict)
         let colorData = try? JSONEncoder().encode(colorsDict)
         let markedCombinationsData = try? JSONEncoder().encode(markedCombinations)
+        let killerMarkedCombinationsData = try? JSONEncoder().encode(markedKillerCombinations)
         let crossData = try? JSONEncoder().encode(crossesDict)
         
-        parentViewModel.saveLevelProgress(levelId: levelID, currentBoard: currentBoardString, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
+        parentViewModel.saveLevelProgress(levelId: levelID, currentBoard: currentBoardString, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, killerMarkedCombinationsData: killerMarkedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
     }
     
     // MARK: - Input Logic
@@ -506,6 +519,7 @@ class SudokuGameViewModel: ObservableObject {
             if markedKillerCombinations[cageID] == nil {
                 let allCombos = KillerMath.getCombinations(sum: cage.sum, count: cage.cells.count, rules: rules, cageCells: cage.cells)
                 markedKillerCombinations[cageID] = Set(allCombos)
+                applyCombinationAutoFilter() // Apply filter immediately after setting defaults
                 saveState() // Instant persistence for defaults
             }
         }
@@ -621,9 +635,6 @@ class SudokuGameViewModel: ObservableObject {
         if allEmptySelected {
             for index in emptyIndices {
                 selectedIndices.remove(index)
-                if selectedCellIndex == index {
-                    selectedCellIndex = nil
-                }
             }
         } else {
             isMultiSelectMode = true
@@ -768,6 +779,8 @@ class SudokuGameViewModel: ObservableObject {
             }
         }
         
+        finishBatchUpdate()
+        applyCombinationAutoFilter()
         finishBatchUpdate(checkWin: true, wasBoardFull: wasFullStart)
         updatePointPairRestrictions()
     }
@@ -838,6 +851,8 @@ class SudokuGameViewModel: ObservableObject {
         
         // 2. Force SwiftData to save and notify observers immediately
         // 2. Force SwiftData to save and notify observers immediately
+        finishBatchUpdate()
+        applyCombinationAutoFilter()
         finishBatchUpdate(checkWin: true, wasBoardFull: wasFullStart)
         
         // 3. Trigger a manual UI 'Pulse'
@@ -878,6 +893,7 @@ class SudokuGameViewModel: ObservableObject {
         }
         
         finishBatchUpdate()
+        applyCombinationAutoFilter()
         
         // Trigger UI Pulse to ensure views switch from Value to Note mode instantly
         self.objectWillChange.send()
@@ -996,12 +1012,12 @@ class SudokuGameViewModel: ObservableObject {
                         
                         cell.notes = currentNotes
                         addMove(cellIndex: neighborIndex, moveType: "Note", oldValue: oldNotesString, newValue: newNotesString, batchID: batchID, performSave: false)
-                    }
                 }
             }
         }
     }
-    
+}
+
     @MainActor
     func didTap19() {
         if selectedCellIndex == nil && selectedIndices.isEmpty {
@@ -1152,6 +1168,109 @@ class SudokuGameViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    // MARK: - Combination Auto-Filtering
+    
+    func applyCombinationAutoFilter() {
+        guard settings?.isAutoFilterCombinationsEnabled == true else { return }
+        
+        var changed = false
+        
+        // 1. Sandwich Auto-Filtering
+        for (clueID, markedSet) in markedCombinations {
+            let (isRow, index) = parseClueID(clueID)
+            let gapDigits = getSandwichGapDigits(isRow: isRow, index: index)
+            
+            if !gapDigits.isEmpty {
+                let filteredSet = markedSet.filter { combo in
+                    gapDigits.allSatisfy { combo.contains($0) }
+                }
+                
+                if filteredSet != markedSet {
+                    markedCombinations[clueID] = filteredSet
+                    changed = true
+                }
+            }
+        }
+        
+        // 2. Killer Auto-Filtering
+        if let cageList = cages {
+            for (cagePos, markedSet) in markedKillerCombinations {
+                guard let cage = cageList.first(where: { 
+                    if let tl = $0.topLeft {
+                        return "\(tl[0]),\(tl[1])" == cagePos
+                    }
+                    return false
+                }) else { continue }
+                let cageDigits = getCageDigits(cage: cage)
+                
+                if !cageDigits.isEmpty {
+                    let filteredSet = markedSet.filter { combo in
+                        cageDigits.allSatisfy { combo.contains($0) }
+                    }
+                    
+                    if filteredSet != markedSet {
+                        markedKillerCombinations[cagePos] = filteredSet
+                        changed = true
+                    }
+                }
+            }
+        }
+        
+        if changed {
+            saveState()
+            objectWillChange.send()
+        }
+    }
+    
+    private func parseClueID(_ id: String) -> (isRow: Bool, index: Int) {
+        let components = id.split(separator: "-")
+        let isRow = components[0] == "Row"
+        let index = Int(components[1]) ?? 0
+        return (isRow, index)
+    }
+    
+    private func getSandwichGapDigits(isRow: Bool, index: Int) -> Set<Int> {
+        var digits = Set<Int>()
+        var indices: [Int] = []
+        
+        if isRow {
+            indices = (0..<9).map { index * 9 + $0 }
+        } else {
+            indices = (0..<9).map { $0 * 9 + index }
+        }
+        
+        let boardValues = indices.map { cells[$0].value }
+        guard let first19 = boardValues.firstIndex(where: { $0 == 1 || $0 == 9 }),
+              let last19 = boardValues.lastIndex(where: { $0 == 1 || $0 == 9 }),
+              first19 != last19 else {
+            return []
+        }
+        
+        for i in (first19 + 1)..<last19 {
+            let val = boardValues[i]
+            if val > 1 && val < 9 {
+                digits.insert(val)
+            }
+        }
+        
+        return digits
+    }
+    
+    private func getCageDigits(cage: SudokuLevel.Cage) -> Set<Int> {
+        var digits = Set<Int>()
+        for r in 0..<9 {
+            for c in 0..<9 {
+                if cage.cells.contains(where: { $0[0] == r && $0[1] == c }) {
+                    let val = cells[r * 9 + c].value
+                    if val != 0 {
+                        digits.insert(val)
+                    }
+                }
+            }
+        }
+        return digits
     }
     
     private func finalizeVictoryCheck() {
@@ -1863,6 +1982,7 @@ class SudokuGameViewModel: ObservableObject {
         isTimerRunning = false
         timer?.invalidate()
         timer = nil
+        applyCombinationAutoFilter()
         saveState()
     }
     
@@ -1997,6 +2117,7 @@ class SudokuGameViewModel: ObservableObject {
             }
         }
         
+        applyCombinationAutoFilter()
         finishBatchUpdate(checkWin: true, wasBoardFull: wasFullStart)
     }
     
@@ -2033,6 +2154,7 @@ class SudokuGameViewModel: ObservableObject {
             }
         }
         
+        applyCombinationAutoFilter()
         finishBatchUpdate(checkWin: true, wasBoardFull: wasFullStart)
     }
     

@@ -60,6 +60,10 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    
+                    Toggle("Disable Completed Digits", isOn: $settings.isDisableCompletedDigitsEnabled)
+                    Toggle("Show Combination Helpers", isOn: $settings.isCombinationHelperEnabled)
+                    Toggle("Auto-Filter Combinations", isOn: $settings.isAutoFilterCombinationsEnabled)
                 }
                 
                 Section(header: Text("Appearance")) {
@@ -70,8 +74,6 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.menu)
                 }
-                
-
                 
                 Section(header: Text("Support")) {
                     if storeManager.isAdsRemoved {

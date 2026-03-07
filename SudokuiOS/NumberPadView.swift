@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NumberPadView: View {
     var completedDigits: Set<Int>
+    var isDisableEnabled: Bool = true
     var isSandwich: Bool = false
     
     // Action closure: passes the number tapped (1-9), or 0 for clear/delete
@@ -27,7 +28,7 @@ struct NumberPadView: View {
             
             HStack(spacing: spacing) {
                 ForEach(1...9, id: \.self) { number in
-                    NumberButton(number: number, isCompleted: completedDigits.contains(number), size: safeButtonSize) {
+                    NumberButton(number: number, isCompleted: completedDigits.contains(number), isDisableEnabled: isDisableEnabled, size: safeButtonSize) {
                         action(number)
                     }
                 }
@@ -47,6 +48,7 @@ struct NumberPadView: View {
 struct NumberButton: View {
     let number: Int
     let isCompleted: Bool
+    let isDisableEnabled: Bool
     let size: CGFloat
     var action: () -> Void
     
@@ -61,8 +63,8 @@ struct NumberButton: View {
                 .cornerRadius(size * 0.2) // Proportional corner radius
         }
         .buttonStyle(ScaleButtonStyle())
-        .opacity(isCompleted ? 0.3 : 1.0)
-        .disabled(isCompleted)
+        .opacity((isCompleted && isDisableEnabled) ? 0.3 : 1.0)
+        .disabled(isCompleted && isDisableEnabled)
     }
 }
 

@@ -33,8 +33,11 @@ final class AppSettings {
     var mistakeModeRaw: String = "onFull" // Default .whenBoardFull
     var hasSeenPotentialWarning: Bool = false
     var hasSeenTutorial: Bool = false
+    var isDisableCompletedDigitsEnabled: Bool = true
+    var isCombinationHelperEnabled: Bool = true
+    var isAutoFilterCombinationsEnabled: Bool = true
     
-    init(isMinimalHighlight: Bool = true, highlightMode: HighlightMode = .restriction, isTimerVisible: Bool = true, isHighlightSameNumberEnabled: Bool = true, isHighlightSameNoteEnabled: Bool = true, showMistakes: Bool = true, mistakeMode: MistakeMode = .onFull, hasSeenPotentialWarning: Bool = false, hasSeenTutorial: Bool = false) {
+    init(isMinimalHighlight: Bool = true, highlightMode: HighlightMode = .restriction, isTimerVisible: Bool = true, isHighlightSameNumberEnabled: Bool = true, isHighlightSameNoteEnabled: Bool = true, showMistakes: Bool = true, mistakeMode: MistakeMode = .onFull, hasSeenPotentialWarning: Bool = false, hasSeenTutorial: Bool = false, isDisableCompletedDigitsEnabled: Bool = true, isCombinationHelperEnabled: Bool = true, isAutoFilterCombinationsEnabled: Bool = true) {
         self.isMinimalHighlight = isMinimalHighlight
         self.highlightModeRaw = highlightMode.rawValue
         self.isTimerVisible = isTimerVisible
@@ -45,6 +48,9 @@ final class AppSettings {
         self.mistakeModeRaw = mistakeMode.rawValue
         self.hasSeenPotentialWarning = hasSeenPotentialWarning
         self.hasSeenTutorial = hasSeenTutorial
+        self.isDisableCompletedDigitsEnabled = isDisableCompletedDigitsEnabled
+        self.isCombinationHelperEnabled = isCombinationHelperEnabled
+        self.isAutoFilterCombinationsEnabled = isAutoFilterCombinationsEnabled
     }
     
     // Bridge to UserDefaults for Ad Free Status (User Request)

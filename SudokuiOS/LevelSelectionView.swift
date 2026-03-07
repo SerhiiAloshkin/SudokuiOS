@@ -261,6 +261,7 @@ struct LevelCardView: View {
                     }
                 }
             }
+            .padding(3) // Pull icons away from the edges
         }
     }
     

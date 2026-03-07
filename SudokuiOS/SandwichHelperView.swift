@@ -104,12 +104,33 @@ struct CombinationRowView: View {
     let isSelected: Bool
     let action: () -> Void
     
+    // Dynamic Sizing Logic
+    private var tokenSize: CGFloat {
+        let count = combination.count
+        if count <= 6 { return 32 }
+        if count == 7 { return 28 }
+        if count == 8 { return 24 }
+        return 22 // 9 digits
+    }
+    
+    private var fontSize: CGFloat {
+        let count = combination.count
+        if count <= 6 { return 16 }
+        if count == 7 { return 14 }
+        if count == 8 { return 12 }
+        return 11 // 9 digits
+    }
+    
+    private var tokenSpacing: CGFloat {
+        return combination.count > 7 ? 4 : 8
+    }
+    
     var body: some View {
         Button(action: action) {
-            HStack {
+            HStack(spacing: tokenSpacing) {
                 // Number Tokens
                 ForEach(combination, id: \.self) { num in
-                    CombinationTokenView(number: num, isSelected: isSelected)
+                    CombinationTokenView(number: num, isSelected: isSelected, size: tokenSize, fontSize: fontSize)
                 }
                 
                 Spacer()
@@ -119,7 +140,8 @@ struct CombinationRowView: View {
                     .foregroundColor(isSelected ? .green : .gray.opacity(0.4))
                     .font(.title2)
             }
-            .padding(12)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 10)
             .background(rowBackground)
         }
         .buttonStyle(PlainButtonStyle())
@@ -139,12 +161,14 @@ struct CombinationRowView: View {
 struct CombinationTokenView: View {
     let number: Int
     let isSelected: Bool
+    let size: CGFloat
+    let fontSize: CGFloat
     
     var body: some View {
         Text("\(number)")
-            .font(.system(size: 16, weight: .bold))
+            .font(.system(size: fontSize, weight: .bold))
             .foregroundColor(.primary)
-            .frame(width: 32, height: 32)
+            .frame(width: size, height: size)
             .background(tokenBackground)
     }
     

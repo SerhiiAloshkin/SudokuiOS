@@ -96,6 +96,7 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
 
     var colorData: Data?
     var markedCombinationsData: Data?
+    var killerMarkedCombinationsData: Data?
     var crossData: Data?
     var timeElapsed: Int = 0
     
@@ -365,6 +366,7 @@ class LevelViewModel: ObservableObject {
                     levels[index].notesData = progress.notesData
                     levels[index].colorData = progress.colorData
                     levels[index].markedCombinationsData = progress.markedCombinationsData
+                    levels[index].killerMarkedCombinationsData = progress.killerMarkedCombinationsData
                     levels[index].crossData = progress.crossData
                     levels[index].timeElapsed = progress.timeElapsed
                     levels[index].isAdUnlocked = progress.isAdUnlocked
@@ -487,7 +489,7 @@ class LevelViewModel: ObservableObject {
         // CloudStorageManager.shared.markLevelSolved(levelId)
     }
     
-    func saveLevelProgress(levelId: Int, currentBoard: String, notesData: Data? = nil, colorData: Data? = nil, markedCombinationsData: Data? = nil, crossData: Data? = nil, timeElapsed: Int = 0) {
+    func saveLevelProgress(levelId: Int, currentBoard: String, notesData: Data? = nil, colorData: Data? = nil, markedCombinationsData: Data? = nil, killerMarkedCombinationsData: Data? = nil, crossData: Data? = nil, timeElapsed: Int = 0) {
         guard let context = modelContext else { return }
         
         if let progress = fetchProgress(for: levelId, in: context) {
@@ -495,10 +497,11 @@ class LevelViewModel: ObservableObject {
             progress.notesData = notesData
             progress.colorData = colorData
             progress.markedCombinationsData = markedCombinationsData
+            progress.killerMarkedCombinationsData = killerMarkedCombinationsData
             progress.crossData = crossData
             progress.timeElapsed = timeElapsed
         } else {
-            let newProgress = UserLevelProgress(levelID: levelId, currentUserBoard: currentBoard, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
+            let newProgress = UserLevelProgress(levelID: levelId, currentUserBoard: currentBoard, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, killerMarkedCombinationsData: killerMarkedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
             context.insert(newProgress)
         }
         
@@ -508,6 +511,7 @@ class LevelViewModel: ObservableObject {
             levels[index].notesData = notesData
             levels[index].colorData = colorData
             levels[index].markedCombinationsData = markedCombinationsData
+            levels[index].killerMarkedCombinationsData = killerMarkedCombinationsData
             levels[index].crossData = crossData
             levels[index].timeElapsed = timeElapsed
         }
@@ -523,6 +527,7 @@ class LevelViewModel: ObservableObject {
             levels[index].notesData = nil
             levels[index].colorData = nil
             levels[index].markedCombinationsData = nil
+            levels[index].killerMarkedCombinationsData = nil
             levels[index].crossData = nil
             levels[index].timeElapsed = 0
             // Reset other transient fields if necessary
@@ -540,6 +545,7 @@ class LevelViewModel: ObservableObject {
             progress.notesData = nil
             progress.colorData = nil
             progress.markedCombinationsData = nil
+            progress.killerMarkedCombinationsData = nil
             progress.crossData = nil
             progress.timeElapsed = 0
             progress.bestTime = 0 // Optional: do we reset best time? Usually resetLevel implies resetting 'current run'.

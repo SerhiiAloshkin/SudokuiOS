@@ -102,6 +102,11 @@ struct SudokuGameView: View {
             gameViewModel.setSettings(settings)
             gameViewModel.startTimer()
         }
+        .onChange(of: settings.isAutoFilterCombinationsEnabled) { _, newValue in
+            if newValue {
+                gameViewModel.applyCombinationAutoFilter()
+            }
+        }
         .onDisappear {
             gameViewModel.stopTimer()
         }
@@ -515,6 +520,7 @@ struct SudokuGameView: View {
 
     struct SudokuHeaderView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
+        @Environment(AppSettings.self) var settings
         
         var body: some View {
             ZStack {
@@ -546,7 +552,7 @@ struct SudokuGameView: View {
                 // Right-aligned Killer Button
                 HStack {
                     Spacer()
-                    if let cages = gameViewModel.cages, !cages.isEmpty {
+                    if let cages = gameViewModel.cages, !cages.isEmpty, settings.isCombinationHelperEnabled {
                         Button(action: { gameViewModel.isKillerHelperPresented = true }) {
                                 Image(systemName: "list.bullet.rectangle")
                                     .font(.system(size: 18, weight: .semibold))
@@ -564,6 +570,7 @@ struct SudokuGameView: View {
             struct SudokuControlsView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
         @Binding var showColorPicker: Bool
+        @Environment(AppSettings.self) var settings
         
         var body: some View {
             VStack(spacing: 20) {
@@ -717,7 +724,11 @@ struct SudokuGameView: View {
                     .padding(.bottom, 8)
                 
                 // Number Pad
-                NumberPadView(completedDigits: gameViewModel.completedDigits, isSandwich: gameViewModel.rules.contains(.sandwich)) { number in
+                NumberPadView(
+                    completedDigits: gameViewModel.completedDigits,
+                    isDisableEnabled: settings.isDisableCompletedDigitsEnabled,
+                    isSandwich: gameViewModel.rules.contains(.sandwich)
+                ) { number in
                     gameViewModel.didTapNumber(number)
                 } action19: {
                     gameViewModel.didTap19()
@@ -931,6 +942,7 @@ struct SudokuGameView: View {
         }
     }
 }
+
 
 struct WaveEffect: ViewModifier {
     let index: Int
