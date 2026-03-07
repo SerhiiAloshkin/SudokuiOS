@@ -16,6 +16,7 @@ final class UserLevelProgress {
     var isAdUnlocked: Bool = false // Rewarded Ad Unlock Status
     var isUnlocked: Bool = false // Sticky Unlock Status (Maintains access even if prev level reset)
     var timeElapsed: Int = 0 
+    var lastSolvedTime: Double = 0.0
     
     @Relationship(deleteRule: .cascade, inverse: \MoveHistory.levelProgress)
     var moves: [MoveHistory]? = []
@@ -33,6 +34,7 @@ final class UserLevelProgress {
         self.isAdUnlocked = isAdUnlocked
         self.isUnlocked = isUnlocked
         self.timeElapsed = timeElapsed
+        self.lastSolvedTime = 0.0
         self.moves = []
     }
 }

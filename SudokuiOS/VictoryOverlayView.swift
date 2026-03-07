@@ -3,6 +3,7 @@ import SwiftUI
 struct VictoryOverlayView: View {
     // Inputs
     let timeElapsed: String
+    let bestTime: Double
     let currentLevelID: Int
     let nextLevelID: Int
     let nextLevelVariant: SudokuRuleType
@@ -47,18 +48,44 @@ struct VictoryOverlayView: View {
                     )
                     .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 5)
                 
-                // 3. Time Stat
-                HStack(spacing: 8) {
-                    Image(systemName: "stopwatch.fill")
-                        .foregroundColor(.secondary)
-                    Text(timeElapsed)
-                        .font(.system(size: 24, weight: .bold, design: .monospaced))
-                        .foregroundColor(.primary)
+                // 3. Time Stats
+                VStack(spacing: 8) {
+                    HStack(spacing: 20) {
+                        VStack(spacing: 4) {
+                            Text("TIME")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.secondary)
+                            HStack(spacing: 4) {
+                                Image(systemName: "stopwatch")
+                                    .font(.system(size: 12))
+                                Text(timeElapsed)
+                                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                            }
+                        }
+                        
+                        if bestTime > 0 {
+                            Divider()
+                                .frame(height: 30)
+                            
+                            VStack(spacing: 4) {
+                                Text("BEST")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                HStack(spacing: 4) {
+                                    Image(systemName: "trophy.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.orange)
+                                    Text(formatBestTime(bestTime))
+                                        .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                }
+                            }
+                        }
+                    }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
                 .background(Color.secondary.opacity(0.1))
-                .cornerRadius(12)
+                .cornerRadius(16)
                 
                 // 4. Next Level Preview
                 VStack(spacing: 12) {
@@ -214,11 +241,19 @@ struct VictoryOverlayView: View {
                 .font(.title)
         }
     }
+    
+    private func formatBestTime(_ seconds: Double) -> String {
+        let totalSeconds = Int(seconds)
+        let m = totalSeconds / 60
+        let s = totalSeconds % 60
+        return String(format: "%02d:%02d", m, s)
+    }
 }
 
 #Preview {
     VictoryOverlayView(
         timeElapsed: "04:20",
+        bestTime: 240.0,
         currentLevelID: 14,
         nextLevelID: 15,
         nextLevelVariant: .oddEven,

@@ -99,6 +99,8 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
     var killerMarkedCombinationsData: Data?
     var crossData: Data?
     var timeElapsed: Int = 0
+    var bestTime: Double = 0.0
+    var lastSolvedTime: Double = 0.0
     
     enum CodingKeys: String, CodingKey {
         case id, board, clues, solution, difficulty, ruleType, variant, types, rowClues, colClues, sandwich_clues, thermoPaths, arrows, cages, white_dots, black_dots, negative_constraint, parity
@@ -369,6 +371,9 @@ class LevelViewModel: ObservableObject {
                     levels[index].killerMarkedCombinationsData = progress.killerMarkedCombinationsData
                     levels[index].crossData = progress.crossData
                     levels[index].timeElapsed = progress.timeElapsed
+                    levels[index].bestTime = progress.bestTime
+                    // Fallback for legacy solved levels: use bestTime as lastSolvedTime if it's missing
+                    levels[index].lastSolvedTime = (progress.lastSolvedTime == 0 && progress.isSolved) ? progress.bestTime : progress.lastSolvedTime
                     levels[index].isAdUnlocked = progress.isAdUnlocked
                     levels[index].isUnlocked = progress.isUnlocked // Persistent Sticky Unlock
                 }
@@ -464,8 +469,13 @@ class LevelViewModel: ObservableObject {
     
     func saveProgress(levelId: Int, timeElapsed: Int) {
         // 1. Update In-Memory
+        let newTime = Double(timeElapsed)
         if let index = levels.firstIndex(where: { $0.id == levelId }) {
             levels[index].isSolved = true
+            levels[index].lastSolvedTime = newTime
+            if levels[index].bestTime == 0 || newTime < levels[index].bestTime {
+                levels[index].bestTime = newTime
+            }
         }
         
         // 2. Update Persistence
@@ -473,13 +483,15 @@ class LevelViewModel: ObservableObject {
         
         if let progress = fetchProgress(for: levelId, in: context) {
             progress.isSolved = true
-            // Update Best Time
-            let newTime = Double(timeElapsed)
+            // Update Stats
+            progress.lastSolvedTime = newTime // Record the last solve time
+            
             if progress.bestTime == 0 || newTime < progress.bestTime {
                 progress.bestTime = newTime
             }
         } else {
-            let newProgress = UserLevelProgress(levelID: levelId, isSolved: true, bestTime: Double(timeElapsed))
+            let newProgress = UserLevelProgress(levelID: levelId, isSolved: true, bestTime: newTime)
+            newProgress.lastSolvedTime = newTime
             context.insert(newProgress)
         }
         
@@ -548,7 +560,8 @@ class LevelViewModel: ObservableObject {
             progress.killerMarkedCombinationsData = nil
             progress.crossData = nil
             progress.timeElapsed = 0
-            progress.bestTime = 0 // Optional: do we reset best time? Usually resetLevel implies resetting 'current run'.
+            // We PRESERVE progress.bestTime and progress.lastSolvedTime here
+            // so the user doesn't lose their records when they restart the level to play again.
                                   // BUT the user objective said "Complete Level Reset".
                                   // If they want to wipe history, maybe wipe best time too?
                                   // User request: "Set levelProgress.isSolved = false... Clear all values... Purge Undo/Redo"

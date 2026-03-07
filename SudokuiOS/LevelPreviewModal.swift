@@ -65,11 +65,24 @@ struct LevelPreviewModal: View {
                 
                 // Status Section
                 if level.isSolved {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Solved: \(formatTime(seconds: level.timeElapsed))")
-                            .fontWeight(.semibold)
+                    VStack(spacing: 4) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Solved: \(formatTime(seconds: Int(level.lastSolvedTime)))")
+                                .fontWeight(.semibold)
+                        }
+                        
+                        if level.bestTime > 0 {
+                            HStack {
+                                Image(systemName: "trophy.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.caption)
+                                Text("Best: \(formatTime(seconds: Int(level.bestTime)))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
                     .padding()
                 } else if level.userProgress != nil && !level.isLocked {

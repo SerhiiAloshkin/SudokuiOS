@@ -208,6 +208,7 @@ class SudokuGameViewModel: ObservableObject {
     @Published var blackDots: [SudokuLevel.KropkiDot]?
     @Published var negativeConstraint: Bool = false
     @Published var parityOverlay: String? // For Odd-Even Sudoku
+    @Published var bestTime: Double = 0.0
 
     
 
@@ -270,6 +271,7 @@ class SudokuGameViewModel: ObservableObject {
         self.negativeConstraint = level.negative_constraint ?? false
         self.parityOverlay = level.parity
         self.isSolved = level.isSolved
+        self.bestTime = level.bestTime
         
         self.ruleType = level.ruleType
         // Hybrid Support: Use 'types' if available, otherwise fallback to single 'ruleType'
@@ -1293,6 +1295,13 @@ class SudokuGameViewModel: ObservableObject {
         
         // 3. Update Progress
         isSolved = true
+        
+        // Update local best time for victory screen
+        let currentTotalSeconds = Double(timeElapsed)
+        if bestTime == 0 || currentTotalSeconds < bestTime {
+            bestTime = currentTotalSeconds
+        }
+        
         parentViewModel.levelSolved(id: levelID, timeElapsed: timeElapsed)
         
         // Clear Last Unfinished Level

@@ -75,6 +75,7 @@ struct SudokuGameView: View {
                      
                      VictoryOverlayView(
                         timeElapsed: gameViewModel.formattedTime,
+                        bestTime: gameViewModel.bestTime,
                         currentLevelID: gameViewModel.levelID,
                         nextLevelID: nextID,
                         nextLevelVariant: nextVariant,
