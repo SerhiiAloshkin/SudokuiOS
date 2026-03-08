@@ -59,6 +59,12 @@ final class AppSettings {
         set { UserDefaults.standard.set(newValue, forKey: "isAdsRemoved") }
     }
     
+    // Bridge to UserDefaults for Hint Targeting
+    var hintAppliesToSelectedCell: Bool {
+        get { UserDefaults.standard.bool(forKey: "hintAppliesToSelectedCell") }
+        set { UserDefaults.standard.set(newValue, forKey: "hintAppliesToSelectedCell") }
+    }
+    
     var highlightMode: HighlightMode {
         get { HighlightMode(rawValue: highlightModeRaw) ?? .restriction }
         set { highlightModeRaw = newValue.rawValue }

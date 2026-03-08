@@ -209,7 +209,16 @@ class SudokuGameViewModel: ObservableObject {
     @Published var negativeConstraint: Bool = false
     @Published var parityOverlay: String? // For Odd-Even Sudoku
     @Published var bestTime: Double = 0.0
-
+    
+    // New Gameplay Mechanics
+    @Published var mistakesCount: Int = 0
+    @Published var hintsUsed: Int = 0
+    @Published var isGameOver = false
+    @Published var hintCooldownRemaining: Int = 0 // Seconds
+    private var hintCooldownTimer: Timer?
+    @Published var showHintErrorAlert: Bool = false
+    var hintErrorMessage: String = ""
+    @Published var isRewardedAdLoading: Bool = false
     
 
     
@@ -290,7 +299,14 @@ class SudokuGameViewModel: ObservableObject {
             self.timeElapsed = 0
         }
         
-        // 3. Load Notes
+        // 4. Reset Gameplay Stats
+        self.mistakesCount = 0
+        self.hintsUsed = 0
+        self.isGameOver = false
+        self.hintCooldownRemaining = 0
+        self.hintCooldownTimer?.invalidate()
+        
+        // 5. Load Notes
         if let notesData = level.notesData {
             if let decodedStringNotes = try? JSONDecoder().decode([String: Set<Int>].self, from: notesData) {
                 self.notes = Dictionary(uniqueKeysWithValues: decodedStringNotes.compactMap { (key, val) in
@@ -842,7 +858,30 @@ class SudokuGameViewModel: ObservableObject {
                 // Clear revealed state for this cell when edited
                 revealedMistakeIndices.remove(index)
                 
+                // Add move history BEFORE value change
                 addMove(cellIndex: index, moveType: "Value", oldValue: oldValue, newValue: newValue, batchID: batchID, performSave: false)
+                
+                // --- Mistake Check Logic ---
+                let mode = settings?.mistakeMode ?? .immediate
+                if targetValue != 0 && mode == .immediate {
+                    let isIncorrect = targetValue != solutionArray[index]
+                    if isIncorrect {
+                        // It's a mistake!
+                        mistakesCount += 1
+                        
+                        // Check Game Over
+                        if mistakesCount >= 3 {
+                            DispatchQueue.main.async {
+                                self.isGameOver = true
+                                self.stopTimer()
+                            }
+                        }
+                        
+                        // We do NOT stop entering the value, it still gets placed
+                        // The UI will highlight it as red because isMistake(at:) returns true.
+                    }
+                }
+                // ---------------------------
                 
                 // 3. Auto-Pruning Hook (If setting a value)
                 if targetValue != 0 {
@@ -1302,7 +1341,8 @@ class SudokuGameViewModel: ObservableObject {
             bestTime = currentTotalSeconds
         }
         
-        parentViewModel.levelSolved(id: levelID, timeElapsed: timeElapsed)
+        let isPerfect = (mistakesCount == 0 && hintsUsed == 0)
+        parentViewModel.levelSolved(id: levelID, timeElapsed: timeElapsed, isPerfect: isPerfect)
         
         // Clear Last Unfinished Level
         UserDefaults.standard.set(-1, forKey: "lastUnfinishedLevelID")
@@ -1407,6 +1447,112 @@ class SudokuGameViewModel: ObservableObject {
             }
         }
         return false
+    }
+    
+    // MARK: - Hints
+    
+    @MainActor
+    func useHint(storeManager: StoreManager, adCoordinator: AdCoordinator) {
+        guard !isGameOver && !isSolved else { return }
+        
+        // 1. Check user preference
+        let appliesToSelected = UserDefaults.standard.bool(forKey: "hintAppliesToSelectedCell")
+        
+        var targetIndex: Int? = nil
+        
+        if appliesToSelected {
+            // Selected Cell Logic
+            guard let selected = selectedIndices.first, selectedIndices.count == 1 else {
+                hintErrorMessage = "Please select an empty cell to use a hint."
+                showHintErrorAlert = true
+                return
+            }
+            if cells[selected].value == solutionArray[selected] {
+                hintErrorMessage = "The selected cell is already correct!"
+                showHintErrorAlert = true
+                return
+            }
+            if isClue(at: selected) {
+                hintErrorMessage = "You cannot use a hint on a given clue."
+                showHintErrorAlert = true
+                return
+            }
+            targetIndex = selected
+        } else {
+            // Random Cell Logic
+            var candidates: [Int] = []
+            for i in 0..<81 {
+                if cells[i].value == 0 || cells[i].value != solutionArray[i] {
+                    // Don't override clues
+                    if !isClue(at: i) {
+                        candidates.append(i)
+                    }
+                }
+            }
+            targetIndex = candidates.randomElement()
+        }
+        
+        guard let validTargetIndex = targetIndex else { return }
+        
+        let applyHint = {
+            self.hintsUsed += 1
+            let correctValue = self.solutionArray[validTargetIndex]
+            
+            // Apply it via batch to handle note pruning, etc.
+            self.selectedIndices = [validTargetIndex]
+            
+            // Bypass note mode for hint application
+            let wasNoteMode = self.isNoteMode
+            self.isNoteMode = false
+            
+            // Only toggle the cell if we need to insert the value
+            // Since it's incorrect or empty, we just force enter the correct number
+            if self.cells[validTargetIndex].value != 0 {
+                // Clear incorrect value first
+                self.enterNumber(self.cells[validTargetIndex].value)
+            }
+            self.enterNumber(correctValue)
+            
+            // Restore state
+            self.isNoteMode = wasNoteMode
+            // Keep the cell selected for convenience
+            // self.selectedIndices = []
+        }
+        
+        if storeManager.isAdsRemoved {
+            // Premium Cooldown (3 minutes = 180 seconds)
+            applyHint()
+            startHintCooldown()
+        } else {
+            // Rewarded Ad
+            self.isRewardedAdLoading = true
+            adCoordinator.showRewardedVideo { success in
+                DispatchQueue.main.async {
+                    self.isRewardedAdLoading = false
+                    if success {
+                        applyHint()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func startHintCooldown() {
+        hintCooldownTimer?.invalidate()
+        hintCooldownRemaining = 180 // 3 minutes
+        hintCooldownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            DispatchQueue.main.async {
+                if self.hintCooldownRemaining > 0 {
+                    self.hintCooldownRemaining -= 1
+                } else {
+                    timer.invalidate()
+                }
+            }
+        }
     }
     
     func shouldShowMistake(at index: Int) -> Bool {
@@ -2219,6 +2365,13 @@ class SudokuGameViewModel: ObservableObject {
             self.isSolved = false
             self.isGameComplete = false
             
+            // Reset New Gameplay Stats
+            self.mistakesCount = 0
+            self.hintsUsed = 0
+            self.isGameOver = false
+            self.hintCooldownRemaining = 0
+            self.hintCooldownTimer?.invalidate()
+            
             // Reset Board
             if let level = parentViewModel.levels.first(where: { $0.id == levelID }) {
                 // Restore original board (ignoring progress)
@@ -2244,6 +2397,11 @@ class SudokuGameViewModel: ObservableObject {
                     }
                     self.historyIndex = -1
                 }
+                
+                // Clear Selections
+                self.selectedIndices.removeAll()
+                self.selectedCage = nil
+                self.isKillerHelperPresented = false
                 
                 // Re-Initialize Cells
                 self.initializeCells()

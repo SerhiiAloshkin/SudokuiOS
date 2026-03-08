@@ -1,6 +1,7 @@
 
 import SwiftUI
 import StoreKit
+import MessageUI
 
 struct SettingsView: View {
     @Bindable var settings: AppSettings
@@ -10,6 +11,15 @@ struct SettingsView: View {
     // Warning State
     @State private var showPotentialWarning = false
     @State private var pendingHighlightMode: HighlightMode?
+    
+    // Mail State
+    @State private var showingMail = false
+    @State private var mailResult: Result<MFMailComposeResult, Error>?
+    @State private var showMailFallbackAlert = false
+    
+    @AppStorage("hintAppliesToSelectedCell") private var hintAppliesToSelectedCell: Bool = false
+    
+    private let supportEmail = "help.sudokuversa@gmail.com"
     
     var body: some View {
         NavigationView {
@@ -64,6 +74,12 @@ struct SettingsView: View {
                     Toggle("Disable Completed Digits", isOn: $settings.isDisableCompletedDigitsEnabled)
                     Toggle("Show Combination Helpers", isOn: $settings.isCombinationHelperEnabled)
                     Toggle("Auto-Filter Combinations", isOn: $settings.isAutoFilterCombinationsEnabled)
+                    
+                    Picker("Hint Target", selection: $hintAppliesToSelectedCell) {
+                        Text("Random Cell").tag(false)
+                        Text("Selected Cell").tag(true)
+                    }
+                    .pickerStyle(.menu)
                 }
                 
                 Section(header: Text("Appearance")) {
@@ -76,6 +92,21 @@ struct SettingsView: View {
                 }
                 
                 Section(header: Text("Support")) {
+                    Button(action: {
+                        if MFMailComposeViewController.canSendMail() {
+                            showingMail = true
+                        } else {
+                            showMailFallbackAlert = true
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "envelope.fill")
+                                .foregroundColor(.blue)
+                            Text("Contact Us")
+                                .foregroundColor(.primary)
+                        }
+                    }
+                    
                     if storeManager.isAdsRemoved {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
@@ -144,6 +175,54 @@ struct SettingsView: View {
             } message: {
                 Text("This mode highlights all valid positions for a number, which can make the game significantly easier. You might find the puzzles less challenging or lose interest more quickly. Do you still want to activate it?")
             }
+            .sheet(isPresented: $showingMail) {
+                MailView(
+                    result: $mailResult,
+                    recipients: [supportEmail],
+                    subject: "Sudoku Versa Feedback",
+                    messageBody: supportEmailBody
+                )
+            }
+            .alert("Cannot Send Email", isPresented: $showMailFallbackAlert) {
+                Button("Copy Support Email") {
+                    UIPasteboard.general.string = supportEmail
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Your device is not configured to send emails. Please contact us at \(supportEmail).")
+            }
         }
+    }
+    
+    // MARK: - Email Support Help
+    private var supportEmailBody: String {
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+        let iosVersion = UIDevice.current.systemVersion
+        let deviceModel = UIDevice.current.modelIdentifier
+        
+        return """
+        
+        
+        
+        ---------------------------------
+        Technical details for support:
+        App Version: \(appVersion) (\(buildNumber))
+        iOS Version: \(iosVersion)
+        Device Model: \(deviceModel)
+        """
+    }
+}
+
+extension UIDevice {
+    var modelIdentifier: String {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let machineMirror = Mirror(reflecting: systemInfo.machine)
+        let identifier = machineMirror.children.reduce("") { identifier, element in
+            guard let value = element.value as? Int8, value != 0 else { return identifier }
+            return identifier + String(UnicodeScalar(UInt8(value)))
+        }
+        return identifier
     }
 }

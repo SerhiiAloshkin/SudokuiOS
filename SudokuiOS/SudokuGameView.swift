@@ -4,8 +4,7 @@ import Observation
 
 struct SudokuGameView: View {
     @StateObject private var gameViewModel: SudokuGameViewModel
-    
-    
+    @StateObject private var storeManager = StoreManager()
     
     var onNextLevel: (Int) -> Void = { _ in } // Callback for next level navigation, receives Target ID
     @ObservedObject var adCoordinator: AdCoordinator // Injected for Rewarded Ads
@@ -35,6 +34,8 @@ struct SudokuGameView: View {
                 VStack(spacing: 8) {
                     // Top Metadata Block
                     SudokuHeaderView(gameViewModel: gameViewModel)
+                        .environmentObject(storeManager)
+                        .environmentObject(adCoordinator)
                     
                     // Game Board
                     SudokuBoardView(gameViewModel: gameViewModel)
@@ -44,6 +45,8 @@ struct SudokuGameView: View {
                     
                     // Controls Container
                     SudokuControlsView(gameViewModel: gameViewModel, showColorPicker: $showColorPicker)
+                        .environmentObject(storeManager)
+                        .environmentObject(adCoordinator)
                     
                     // Bottom Spacer to center controls in lower half
                     Spacer(minLength: 20)
@@ -67,6 +70,19 @@ struct SudokuGameView: View {
                 
                 // Killer Helper Overlay
                 SudokuKillerOverlayView(gameViewModel: gameViewModel)
+                
+                // Game Over Overlay
+                if gameViewModel.isGameOver {
+                    GameOverOverlayView(
+                        onRestart: {
+                            gameViewModel.restartLevel()
+                        },
+                        onDismiss: {
+                            dismiss()
+                        }
+                    )
+                    .zIndex(200)
+                }
                 
                 // Victory Overlay
                 if gameViewModel.isGameComplete {
@@ -119,6 +135,9 @@ struct SudokuGameView: View {
             }
         } message: {
             Text("This will clear all your progress.")
+        }
+        .alert(gameViewModel.hintErrorMessage, isPresented: $gameViewModel.showHintErrorAlert) {
+            Button("OK", role: .cancel) { }
         }
         .sheet(isPresented: $gameViewModel.isSettingsPresented) {
             SettingsView(settings: settings)
@@ -470,6 +489,124 @@ struct SudokuGameView: View {
         }
     }
     
+    struct GameOverOverlayView: View {
+        let onRestart: () -> Void
+        let onDismiss: () -> Void
+        
+        var body: some View {
+            ZStack {
+                Color.black.opacity(0.8) // Dark overlay background
+                    .edgesIgnoringSafeArea(.all)
+                
+                VStack(spacing: 24) {
+                    Image(systemName: "xmark.octagon.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.red)
+                    
+                    Text("Game Over")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Text("You've made 3 mistakes.\nTime to try again!")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.horizontal)
+                    
+                    VStack(spacing: 16) {
+                        Button(action: onRestart) {
+                            Text("Restart Level")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                        }
+                        
+                        Button(action: onDismiss) {
+                            Text("Back to Grid")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.gray.opacity(0.4))
+                                .cornerRadius(12)
+                        }
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 20)
+                }
+                .padding(32)
+                .background(Color("CardBackground").opacity(0.1)) // Subtle tint (ensure good contrast with black overlay)
+                .cornerRadius(24)
+                .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: 10)
+                // If using light mode only for overlay:
+                // .environment(\.colorScheme, .dark)
+            }
+        }
+    }
+    
+    // MARK: - Hint Button Component
+    struct HintButtonView: View {
+        @ObservedObject var gameViewModel: SudokuGameViewModel
+        @ObservedObject var storeManager: StoreManager
+        @ObservedObject var adCoordinator: AdCoordinator
+        
+        var body: some View {
+            Button(action: {
+                // Ensure action is only possible if not waiting
+                if !gameViewModel.isRewardedAdLoading && gameViewModel.hintCooldownRemaining == 0 {
+                    gameViewModel.useHint(storeManager: storeManager, adCoordinator: adCoordinator)
+                }
+            }) {
+                ZStack {
+                    if storeManager.isAdsRemoved {
+                        // Premium User State
+                        if gameViewModel.hintCooldownRemaining > 0 {
+                            // Cooldown Active
+                            Text("\(gameViewModel.hintCooldownRemaining / 60):\(String(format: "%02d", gameViewModel.hintCooldownRemaining % 60))")
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                .foregroundColor(.orange)
+                                .frame(width: 32, height: 24) // Extra width for text if needed, but fixed height
+                        } else {
+                            // Ready to Hint (Premium)
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.primary)
+                                .frame(width: 24, height: 24)
+                        }
+                    } else {
+                        // Free User State
+                        if gameViewModel.isRewardedAdLoading {
+                            // Loading Ad
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                                .scaleEffect(0.9)
+                                .frame(width: 24, height: 24)
+                        } else {
+                            // Ready for Ad
+                            ZStack(alignment: .bottomTrailing) {
+                                Image(systemName: "lightbulb.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                
+                                Image(systemName: "play.rectangle.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.purple)
+                                    .offset(x: 4, y: 2)
+                            }
+                            .frame(width: 24, height: 24)
+                        }
+                    }
+                }
+            }
+            // Use standard styling, disable while loading ad or in cooldown
+            .buttonStyle(VersaButtonStyle(isEnabled: !gameViewModel.isRewardedAdLoading && gameViewModel.hintCooldownRemaining == 0))
+            .disabled(gameViewModel.isRewardedAdLoading || gameViewModel.hintCooldownRemaining > 0)
+        }
+    }
+    
     struct SudokuSandwichOverlayView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
         
@@ -522,9 +659,23 @@ struct SudokuGameView: View {
     struct SudokuHeaderView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
         @Environment(AppSettings.self) var settings
+        @EnvironmentObject var storeManager: StoreManager
+        @EnvironmentObject var adCoordinator: AdCoordinator
         
         var body: some View {
-            ZStack {
+            ZStack(alignment: .top) {
+                // Left-aligned Hint Button
+                HStack {
+                    HintButtonView(
+                        gameViewModel: gameViewModel,
+                        storeManager: storeManager,
+                        adCoordinator: adCoordinator
+                    )
+                    .padding(.leading)
+                    
+                    Spacer()
+                }
+                
                 // Centered Metadata (Level + Type)
                 VStack(spacing: 4) {
                     HStack(alignment: .center, spacing: 8) {
@@ -561,6 +712,7 @@ struct SudokuGameView: View {
                         Button(action: { gameViewModel.isKillerHelperPresented = true }) {
                                 Image(systemName: "list.bullet.rectangle")
                                     .font(.system(size: 18, weight: .semibold))
+                                    .frame(width: 24, height: 24)
                         }
                         .buttonStyle(VersaButtonStyle(isEnabled: gameViewModel.selectedCage != nil))
                         .disabled(gameViewModel.selectedCage == nil)

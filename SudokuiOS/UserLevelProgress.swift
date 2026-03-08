@@ -17,11 +17,12 @@ final class UserLevelProgress {
     var isUnlocked: Bool = false // Sticky Unlock Status (Maintains access even if prev level reset)
     var timeElapsed: Int = 0 
     var lastSolvedTime: Double = 0.0
+    var isPerfect: Bool = false
     
     @Relationship(deleteRule: .cascade, inverse: \MoveHistory.levelProgress)
     var moves: [MoveHistory]? = []
     
-    init(levelID: Int, isSolved: Bool = false, bestTime: Double = 0.0, currentUserBoard: String? = nil, notesData: Data? = nil, colorData: Data? = nil, markedCombinationsData: Data? = nil, killerMarkedCombinationsData: Data? = nil, crossData: Data? = nil, isAdUnlocked: Bool = false, isUnlocked: Bool = false, timeElapsed: Int = 0) {
+    init(levelID: Int, isSolved: Bool = false, bestTime: Double = 0.0, currentUserBoard: String? = nil, notesData: Data? = nil, colorData: Data? = nil, markedCombinationsData: Data? = nil, killerMarkedCombinationsData: Data? = nil, crossData: Data? = nil, isAdUnlocked: Bool = false, isUnlocked: Bool = false, timeElapsed: Int = 0, isPerfect: Bool = false) {
         self.levelID = levelID
         self.isSolved = isSolved
         self.bestTime = bestTime
@@ -35,6 +36,7 @@ final class UserLevelProgress {
         self.isUnlocked = isUnlocked
         self.timeElapsed = timeElapsed
         self.lastSolvedTime = 0.0
+        self.isPerfect = isPerfect
         self.moves = []
     }
 }
