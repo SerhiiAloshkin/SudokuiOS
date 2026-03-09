@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import Observation
 
+@MainActor
 struct SudokuGameView: View {
     @StateObject private var gameViewModel: SudokuGameViewModel
     @StateObject private var storeManager = StoreManager()
@@ -10,7 +11,7 @@ struct SudokuGameView: View {
     @ObservedObject var adCoordinator: AdCoordinator // Injected for Rewarded Ads
     
     init(levelID: Int, viewModel: LevelViewModel, adCoordinator: AdCoordinator, onNextLevel: @escaping (Int) -> Void = { _ in }) {
-        _gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(levelID: levelID, levelViewModel: viewModel))
+        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(levelID: levelID, levelViewModel: viewModel))
         self.adCoordinator = adCoordinator
         self.onNextLevel = onNextLevel
     }

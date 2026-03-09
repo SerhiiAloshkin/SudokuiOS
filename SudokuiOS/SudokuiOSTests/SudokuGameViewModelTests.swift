@@ -3,6 +3,7 @@
 import XCTest
 @testable import SudokuiOS
 
+@MainActor
 class SudokuGameViewModelTests: XCTestCase {
     
     var levelViewModel: LevelViewModel!

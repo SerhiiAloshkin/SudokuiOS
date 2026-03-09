@@ -13,6 +13,7 @@ struct MainMenuView: View {
     
     enum SudokuRoute: Hashable {
         case levelSelection
+        case levelBuilder
         case game(Int)
     }
     
@@ -131,6 +132,18 @@ struct MainMenuView: View {
                                 .buttonStyle(PrimaryButtonStyle())
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                                 
+                                // 2.5 Level Builder (Primary Action)
+                                Button(action: {
+                                    navigationPath.append(.levelBuilder)
+                                }) {
+                                    HStack {
+                                        Image(systemName: "hammer.fill")
+                                        Text("Level Builder")
+                                    }
+                                }
+                                .buttonStyle(PrimaryButtonStyle())
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                                
                                 // 3. Settings (Secondary Action)
                                 Button(action: {
                                     showSettings = true
@@ -156,6 +169,8 @@ struct MainMenuView: View {
                 switch route {
                 case .levelSelection:
                     LevelSelectionView(navigationStack: $navigationPath)
+                case .levelBuilder:
+                    LevelBuilderView(navigationStack: $navigationPath)
                 case .game(let id):
                      SudokuGameView(levelID: id, viewModel: viewModel, adCoordinator: adCoordinator, onNextLevel: { targetID in
                          print("MainMenuView: traversing to next level \(targetID) from \(id)")

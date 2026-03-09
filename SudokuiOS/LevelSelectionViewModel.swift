@@ -16,6 +16,7 @@ enum LevelFilter: String, CaseIterable {
     case oddEven = "Odd-Even"
     case knight = "Knight"
     case king = "King"
+    case custom = "Custom"
     
     var next: LevelFilter {
         let all = LevelFilter.allCases
@@ -30,9 +31,11 @@ enum LevelFilter: String, CaseIterable {
 class LevelSelectionViewModel: ObservableObject {
     @Published var currentFilter: LevelFilter = .all
     @Published var levels: [SudokuLevel] = []
+    @Published var customLevels: [CustomSudokuLevel] = []
     
-    init(levels: [SudokuLevel] = []) {
+    init(levels: [SudokuLevel] = [], customLevels: [CustomSudokuLevel] = []) {
         self.levels = levels
+        self.customLevels = customLevels
     }
     
     var filteredLevels: [SudokuLevel] {
@@ -63,6 +66,16 @@ class LevelSelectionViewModel: ObservableObject {
             return levels.filter { $0.ruleType == .knight }
         case .king:
             return levels.filter { $0.ruleType == .king }
+        case .custom:
+            return customLevels.enumerated().map { index, custom in
+                SudokuLevel(
+                    id: 9000 + index, // Offset for custom IDs so they dont overlap with 1-600
+                    isLocked: false,
+                    isSolved: custom.isSolved,
+                    board: custom.board,
+                    ruleType: custom.ruleType
+                )
+            }
         }
     }
     
@@ -75,7 +88,8 @@ class LevelSelectionViewModel: ObservableObject {
         currentFilter = currentFilter.next
     }
     
-    func updateLevels(_ newLevels: [SudokuLevel]) {
+    func updateLevels(_ newLevels: [SudokuLevel], customLevels: [CustomSudokuLevel] = []) {
         self.levels = newLevels
+        self.customLevels = customLevels
     }
 }

@@ -4,6 +4,7 @@ import SwiftData
 @testable import SudokuiOS
 
 @MainActor
+@MainActor
 class HighlightSettingsTests: XCTestCase {
     
     var viewModel: SudokuGameViewModel!

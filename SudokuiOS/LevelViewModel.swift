@@ -220,6 +220,7 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
 @MainActor
 class LevelViewModel: ObservableObject {
     @Published var levels: [SudokuLevel] = []
+    @Published var customLevels: [CustomSudokuLevel] = [] // New array for Custom Levels
     
     // Dependencies
     var modelContext: ModelContext?

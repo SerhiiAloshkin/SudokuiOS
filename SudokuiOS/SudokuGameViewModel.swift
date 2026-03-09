@@ -16,15 +16,17 @@ class SudokuCellModel: Identifiable {
     var notes: Set<Int>
     var color: Int?
     var hasCross: Bool
-    let isClue: Bool
+    var isClue: Bool
+    var parity: String?
     
-    init(id: Int, value: Int, notes: Set<Int> = [], color: Int? = nil, hasCross: Bool = false, isClue: Bool) {
+    init(id: Int, row: Int? = nil, col: Int? = nil, value: Int, notes: Set<Int> = [], color: Int? = nil, hasCross: Bool = false, isClue: Bool, parity: String? = nil) {
         self.id = id
         self.value = value
         self.notes = notes
         self.color = color
         self.hasCross = hasCross
         self.isClue = isClue
+        self.parity = parity
     }
 }
 
@@ -259,12 +261,53 @@ class SudokuGameViewModel: ObservableObject {
             parentViewModel.loadLevelsFromJSON()
         }
         
+        let isCustom = levelID >= 9000
+        
+        if isCustom {
+            let customIndex = levelID - 9000
+            guard customIndex >= 0 && customIndex < parentViewModel.customLevels.count else {
+                loadEmptyBoard()
+                return
+            }
+            let customLevel = parentViewModel.customLevels[customIndex]
+            
+            // 1. Set Static Data (Clues & Solution)
+            self.initialBoard = customLevel.board
+            self.solution = customLevel.solution ?? ""
+            self.initialBoardArray = Self.parseBoardString(self.initialBoard)
+            self.solutionArray = Self.parseBoardString(self.solution)
+            self.isSolved = customLevel.isSolved
+            self.bestTime = customLevel.bestTime
+            self.ruleType = customLevel.ruleType
+            self.rules = [customLevel.ruleType]
+            self.negativeConstraint = false // Assuming classic/custom default
+            self.parityOverlay = nil
+            
+            // Decodes
+            if let tData = customLevel.thermoPathsData { self.thermoPaths = try? JSONDecoder().decode([[[Int]]].self, from: tData) }
+            if let aData = customLevel.arrowsData { self.arrows = try? JSONDecoder().decode([SudokuLevel.Arrow].self, from: aData) }
+            if let cData = customLevel.cagesData { self.cages = try? JSONDecoder().decode([SudokuLevel.Cage].self, from: cData) }
+            if let wData = customLevel.whiteDotsData { self.whiteDots = try? JSONDecoder().decode([SudokuLevel.KropkiDot].self, from: wData) }
+            if let bData = customLevel.blackDotsData { self.blackDots = try? JSONDecoder().decode([SudokuLevel.KropkiDot].self, from: bData) }
+            if let rData = customLevel.sandwichRowCluesData { self.rowClues = try? JSONDecoder().decode([Int].self, from: rData) }
+            if let cData = customLevel.sandwichColCluesData { self.colClues = try? JSONDecoder().decode([Int].self, from: cData) }
+            
+            // Current State (Customs don't have transient saves yet in this iteration)
+            self.currentBoard = self.initialBoard
+            self.timeElapsed = 0
+            self.mistakesCount = 0
+            self.hintsUsed = 0
+            self.isGameOver = false
+            self.hintCooldownRemaining = 0
+            self.hintCooldownTimer?.invalidate()
+            
+            finishLoadingBoardSetup()
+            return
+        }
+        
+        // Standard Bundled Levels
         guard let level = parentViewModel.levels.first(where: { $0.id == levelID }) else {
-            let emptyBoard = String(repeating: "0", count: 81)
-            currentBoard = emptyBoard
-            initialBoard = emptyBoard
-            currentBoardArray = Array(repeating: 0, count: 81)
-            initialBoardArray = Array(repeating: 0, count: 81)
+            loadEmptyBoard()
             return
         }
         
@@ -355,20 +398,22 @@ class SudokuGameViewModel: ObservableObject {
              }
         }
         
-        // 5. Load Persistent Object for History
-        if let progress = parentViewModel.getProgress(for: levelID) {
-            self.levelProgress = progress
-            if let moves = progress.moves, !moves.isEmpty {
-                self.historyIndex = moves.count - 1
-            }
-        } else {
-            if let context = parentViewModel.modelContext {
-                let newProgress = UserLevelProgress(levelID: levelID, isSolved: level.isSolved)
-                newProgress.currentUserBoard = self.currentBoard
-                context.insert(newProgress)
-                self.levelProgress = newProgress
-                self.historyIndex = -1
-                try? context.save()
+        // 5. Load Persistent Object for History (Only for standard levels currently)
+        if !isCustom, let level = parentViewModel.levels.first(where: { $0.id == levelID }) {
+            if let progress = parentViewModel.getProgress(for: levelID) {
+                self.levelProgress = progress
+                if let moves = progress.moves, !moves.isEmpty {
+                    self.historyIndex = moves.count - 1
+                }
+            } else {
+                if let context = parentViewModel.modelContext {
+                    let newProgress = UserLevelProgress(levelID: levelID, isSolved: level.isSolved)
+                    newProgress.currentUserBoard = self.currentBoard
+                    context.insert(newProgress)
+                    self.levelProgress = newProgress
+                    self.historyIndex = -1
+                    try? context.save()
+                }
             }
         }
         
@@ -378,6 +423,28 @@ class SudokuGameViewModel: ObservableObject {
     }
     
     @Published var cells: [SudokuCellModel] = []
+    
+    private func loadEmptyBoard() {
+        self.initialBoard = String(repeating: "0", count: 81)
+        self.solution = ""
+        self.initialBoardArray = Array(repeating: 0, count: 81)
+        self.solutionArray = Array(repeating: 0, count: 81)
+        self.currentBoard = self.initialBoard
+        self.ruleType = .classic
+        self.rules = [.classic]
+        self.timeElapsed = 0
+        self.mistakesCount = 0
+        self.hintsUsed = 0
+        self.isGameOver = false
+        self.hintCooldownRemaining = 0
+        self.hintCooldownTimer?.invalidate()
+        self.cells = (0..<81).map { SudokuCellModel(id: $0, row: $0/9, col: $0%9, value: 0, isClue: false) }
+    }
+    
+    private func finishLoadingBoardSetup() {
+        initializeCells()
+        applyCombinationAutoFilter()
+    }
     
     private func initializeCells() {
         var newCells: [SudokuCellModel] = []
@@ -404,7 +471,22 @@ class SudokuGameViewModel: ObservableObject {
             let n = notes[i] ?? []
             let c = cellColors[i]
             let cross = cellCrosses[i] ?? false
-            newCells.append(SudokuCellModel(id: i, value: val, notes: n, color: c, hasCross: cross, isClue: clue))
+            let row = i / 9
+            let col = i % 9
+            let cellParity = self.parityOverlay?[i] ?? "0"
+            let cellParityVal: String? = (cellParity == "1" || cellParity == "2") ? String(cellParity) : nil
+            
+            newCells.append(SudokuCellModel(
+                id: i,
+                row: row,
+                col: col,
+                value: val,
+                notes: n,
+                color: c,
+                hasCross: cross,
+                isClue: clue,
+                parity: cellParityVal
+            ))
         }
         self.cells = newCells
         recalculateCompletedDigits()

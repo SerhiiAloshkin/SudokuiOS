@@ -22,7 +22,8 @@ struct SudokuiOSApp: App {
             let schema = Schema([
                 UserLevelProgress.self,
                 MoveHistory.self,
-                AppSettings.self
+                AppSettings.self,
+                CustomSudokuLevel.self // New Level Builder Model
             ])
             let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
