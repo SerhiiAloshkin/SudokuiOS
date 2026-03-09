@@ -160,8 +160,11 @@ final class CustomSudokuLevel: Identifiable {
             typesArray.append(.oddEven)
         }
         
+        // Use unique negative ID from UUID hash to avoid collisions
+        let uniqueID = -abs(id.hashValue % 1_000_000) - 1
+        
         var level = SudokuLevel(
-            id: -1,  // Custom levels use negative/special IDs
+            id: uniqueID,
             isLocked: false,
             isSolved: isSolved,
             board: board,

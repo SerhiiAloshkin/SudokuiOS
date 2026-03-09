@@ -52,6 +52,13 @@ struct LevelBuilderView: View {
         } message: {
             Text("Enter the target sum for this killer cage.")
         }
+        .alert("Name Your Level", isPresented: $viewModel.showSaveNamePrompt) {
+            TextField("Level name", text: $viewModel.pendingLevelName)
+            Button("Save") { viewModel.commitSave(context: modelContext) }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Enter a name, or leave blank for an auto-generated name.")
+        }
     }
     
     // MARK: - Header
@@ -300,6 +307,13 @@ struct LevelBuilderView: View {
         // Arrows (same as SudokuGameView)
         if !viewModel.arrows.isEmpty {
             ArrowDrawingView(arrows: viewModel.arrows)
+                .frame(width: gridSize, height: gridSize)
+                .allowsHitTesting(false)
+        }
+        
+        // Killer Cages (same as SudokuGameView)
+        if !viewModel.cages.isEmpty {
+            KillerCageLayer(cages: viewModel.cages)
                 .frame(width: gridSize, height: gridSize)
                 .allowsHitTesting(false)
         }

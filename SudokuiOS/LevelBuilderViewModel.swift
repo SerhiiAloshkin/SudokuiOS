@@ -81,6 +81,10 @@ class LevelBuilderViewModel: ObservableObject {
     // MARK: - Edit Mode
     var editingLevelID: UUID? = nil
     
+    // MARK: - Save Name Prompt
+    @Published var showSaveNamePrompt: Bool = false
+    @Published var pendingLevelName: String = ""
+    
     enum BuilderTool: Equatable {
         case digit(Int)
         case erase
@@ -313,7 +317,7 @@ class LevelBuilderViewModel: ObservableObject {
     
     // MARK: - Saving & Validation
     
-    private func buildCustomLevel() -> CustomSudokuLevel {
+    private func buildCustomLevel(name: String = "Untitled") -> CustomSudokuLevel {
         let boardString = cells.map { "\($0.value)" }.joined()
         
         let rule: SudokuRuleType
@@ -333,6 +337,7 @@ class LevelBuilderViewModel: ObservableObject {
         
         let level = CustomSudokuLevel(
             id: editingLevelID ?? UUID(),
+            levelName: name,
             board: boardString,
             difficulty: "Custom",
             ruleType: rule,
@@ -353,7 +358,22 @@ class LevelBuilderViewModel: ObservableObject {
         // Commit any in-progress shape before saving
         if isShapeInProgress { finishCurrentShape() }
         
-        let customLevel = buildCustomLevel()
+        // Show name prompt
+        pendingLevelName = ""
+        showSaveNamePrompt = true
+        // Actual save happens in commitSave(context:)
+    }
+    
+    func commitSave(context: ModelContext) {
+        // Generate default name if blank
+        var name = pendingLevelName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if name.isEmpty {
+            let descriptor = FetchDescriptor<CustomSudokuLevel>()
+            let existingCount = (try? context.fetchCount(descriptor)) ?? 0
+            name = "Level \(existingCount + 1)"
+        }
+        
+        let customLevel = buildCustomLevel(name: name)
         
         // If editing, delete old version first
         if let existingID = editingLevelID {

@@ -2,6 +2,8 @@ import SwiftUI
 
 /// Wrapper that converts a CustomSudokuLevel into a standard SudokuLevel
 /// and injects it into LevelViewModel so SudokuGameView can play it.
+/// CRITICAL: Level injection happens in onAppear (NOT body) to prevent
+/// infinite SwiftUI re-render loops from @Published mutations.
 @MainActor
 struct CustomGameWrapperView: View {
     let customLevel: CustomSudokuLevel
@@ -9,16 +11,25 @@ struct CustomGameWrapperView: View {
     @ObservedObject var adCoordinator: AdCoordinator
     @Binding var navigationStack: [MainMenuView.SudokuRoute]
     
+    @State private var levelID: Int? = nil
+    
     var body: some View {
-        let sudokuLevel = customLevel.toSudokuLevel()
-        
-        // Inject the custom level into the LevelViewModel at a reserved slot
-        let _ = viewModel.injectCustomLevel(sudokuLevel)
-        
-        SudokuGameView(
-            levelID: sudokuLevel.id,
-            viewModel: viewModel,
-            adCoordinator: adCoordinator
-        )
+        Group {
+            if let id = levelID {
+                SudokuGameView(
+                    levelID: id,
+                    viewModel: viewModel,
+                    adCoordinator: adCoordinator
+                )
+            } else {
+                ProgressView("Loading level...")
+            }
+        }
+        .onAppear {
+            guard levelID == nil else { return }
+            let sudokuLevel = customLevel.toSudokuLevel()
+            viewModel.injectCustomLevel(sudokuLevel)
+            levelID = sudokuLevel.id
+        }
     }
 }
