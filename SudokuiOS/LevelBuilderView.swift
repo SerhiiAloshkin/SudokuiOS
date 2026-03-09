@@ -44,6 +44,14 @@ struct LevelBuilderView: View {
             Text(result)
         }
         .sensoryFeedback(.warning, trigger: viewModel.showInvalidTapFeedback)
+        .alert("Cage Sum", isPresented: $viewModel.showCageSumPrompt) {
+            TextField("Enter sum", text: $viewModel.pendingCageSum)
+                .keyboardType(.numberPad)
+            Button("OK") { viewModel.commitCageWithSum() }
+            Button("Cancel", role: .cancel) { viewModel.cancelCurrentShape() }
+        } message: {
+            Text("Enter the target sum for this killer cage.")
+        }
     }
     
     // MARK: - Header
@@ -106,8 +114,8 @@ struct LevelBuilderView: View {
                 BuilderToolButton(icon: "arrow.up.right", label: "Arrow", isSelected: viewModel.selectedTool == .arrow) {
                     viewModel.selectedTool = .arrow
                 }
-                BuilderToolButton(icon: "square.dashed", label: "Cage", isSelected: isCageTool) {
-                    viewModel.selectedTool = .cage(10)
+                BuilderToolButton(icon: "square.dashed", label: "Cage", isSelected: viewModel.selectedTool == .cage) {
+                    viewModel.selectedTool = .cage
                 }
                 BuilderToolButton(icon: "circle.square", label: "Odd/Even", isSelected: isOddEvenTool) {
                     viewModel.selectedTool = .oddEven("1")
@@ -129,7 +137,6 @@ struct LevelBuilderView: View {
     private var contextualPalette: some View {
         ZStack {
             if isDigitTool { digitPicker }
-            else if isCageTool { cageSumPicker }
             else if isOddEvenTool { oddEvenPicker }
             else if viewModel.isShapeInProgress { shapeControls }
         }
@@ -351,32 +358,24 @@ struct LevelBuilderView: View {
         .opacity(0.4)
     }
     
-    // Active Arrow: matches ArrowDrawingView style
+    // Active Arrow: uses the REAL ArrowDrawingView for accurate rendering
+    @ViewBuilder
     private func activeArrow(path: [Int], cellSize: CGFloat) -> some View {
-        ZStack {
-            // Line body
-            if path.count > 1 {
-                Path { p in
-                    for (i, cellId) in path.dropFirst().enumerated() {
-                        let center = cellCenter(cellId, cellSize: cellSize)
-                        if i == 0 { p.move(to: center) }
-                        else { p.addLine(to: center) }
-                    }
-                }
-                .stroke(Color.gray, style: StrokeStyle(lineWidth: cellSize * 0.12, lineCap: .butt, lineJoin: .round))
-            }
-            
-            // Circle at bulb (head)
-            if let first = path.first {
-                let c = cellCenter(first, cellSize: cellSize)
-                Circle()
-                    .stroke(Color.gray, lineWidth: 2)
-                    .frame(width: cellSize * 0.8, height: cellSize * 0.8)
-                    .position(x: c.x, y: c.y)
-            }
+        if path.count >= 2 {
+            let bulb = [path[0] / 9, path[0] % 9]
+            let line = path.dropFirst().map { [$0 / 9, $0 % 9] }
+            let tempArrow = SudokuLevel.Arrow(bulb: bulb, line: line)
+            ArrowDrawingView(arrows: [tempArrow])
+        } else if let first = path.first {
+            // Only head placed — just show the circle
+            let c = cellCenter(first, cellSize: cellSize)
+            Circle()
+                .stroke(Color.gray, lineWidth: 2)
+                .frame(width: cellSize * 0.8, height: cellSize * 0.8)
+                .position(x: c.x, y: c.y)
+                .compositingGroup()
+                .opacity(0.4)
         }
-        .compositingGroup()
-        .opacity(0.4)
     }
     
     // Active Cage: dashed outline around selected cells
@@ -451,18 +450,14 @@ struct LevelBuilderView: View {
     var isDigitTool: Bool {
         if case .digit = viewModel.selectedTool { return true }; return false
     }
-    var isCageTool: Bool {
-        if case .cage = viewModel.selectedTool { return true }; return false
-    }
+    var isCageTool: Bool { viewModel.selectedTool == .cage }
     var isOddEvenTool: Bool {
         if case .oddEven = viewModel.selectedTool { return true }; return false
     }
     var currentDigit: Int {
         if case .digit(let n) = viewModel.selectedTool { return n }; return 1
     }
-    var currentCageSum: Int {
-        if case .cage(let s) = viewModel.selectedTool { return s }; return 10
-    }
+    var currentCageSum: Int { return 10 }
     var currentParity: String {
         if case .oddEven(let p) = viewModel.selectedTool { return p }; return "1"
     }
@@ -479,16 +474,7 @@ struct LevelBuilderView: View {
         }
     }
     
-    var cageSumPicker: some View {
-        HStack {
-            Text("Cage Sum: \(currentCageSum)")
-            Stepper("", onIncrement: {
-                viewModel.selectedTool = .cage(min(45, currentCageSum + 1))
-            }, onDecrement: {
-                viewModel.selectedTool = .cage(max(1, currentCageSum - 1))
-            }).labelsHidden()
-        }
-    }
+
     
     var oddEvenPicker: some View {
         HStack(spacing: 12) {

@@ -222,6 +222,15 @@ class LevelViewModel: ObservableObject {
     @Published var levels: [SudokuLevel] = []
     @Published var customLevels: [CustomSudokuLevel] = [] // New array for Custom Levels
     
+    /// Injects a custom SudokuLevel into the levels array so SudokuGameView can load it
+    @discardableResult
+    func injectCustomLevel(_ level: SudokuLevel) -> SudokuLevel {
+        // Remove any previously injected custom level with same ID
+        levels.removeAll { $0.id == level.id }
+        levels.append(level)
+        return level
+    }
+    
     // Dependencies
     var modelContext: ModelContext?
     

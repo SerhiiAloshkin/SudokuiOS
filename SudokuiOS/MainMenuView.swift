@@ -16,7 +16,7 @@ struct MainMenuView: View {
         case levelBuilder
         case levelBuilderEdit(CustomSudokuLevel)
         case customLevels
-        case customGame(UUID)
+        case customGame(CustomSudokuLevel)
         case game(Int)
         
         // Hashable conformance for CustomSudokuLevel
@@ -26,7 +26,7 @@ struct MainMenuView: View {
             case (.levelBuilder, .levelBuilder): return true
             case (.levelBuilderEdit(let a), .levelBuilderEdit(let b)): return a.id == b.id
             case (.customLevels, .customLevels): return true
-            case (.customGame(let a), .customGame(let b)): return a == b
+            case (.customGame(let a), .customGame(let b)): return a.id == b.id
             case (.game(let a), .game(let b)): return a == b
             default: return false
             }
@@ -38,7 +38,7 @@ struct MainMenuView: View {
             case .levelBuilder: hasher.combine("levelBuilder")
             case .levelBuilderEdit(let level): hasher.combine("levelBuilderEdit"); hasher.combine(level.id)
             case .customLevels: hasher.combine("customLevels")
-            case .customGame(let id): hasher.combine("customGame"); hasher.combine(id)
+            case .customGame(let level): hasher.combine("customGame"); hasher.combine(level.id)
             case .game(let id): hasher.combine("game"); hasher.combine(id)
             }
         }
@@ -214,9 +214,13 @@ struct MainMenuView: View {
                     LevelBuilderView(navigationStack: $navigationPath, existingLevel: level)
                 case .customLevels:
                     CustomLevelsListView(navigationStack: $navigationPath)
-                case .customGame:
-                    // TODO: Implement custom level game loading
-                    Text("Custom Game - Coming Soon")
+                case .customGame(let customLevel):
+                    CustomGameWrapperView(
+                        customLevel: customLevel,
+                        viewModel: viewModel,
+                        adCoordinator: adCoordinator,
+                        navigationStack: $navigationPath
+                    )
                 case .game(let id):
                      SudokuGameView(levelID: id, viewModel: viewModel, adCoordinator: adCoordinator, onNextLevel: { targetID in
                          print("MainMenuView: traversing to next level \(targetID) from \(id)")

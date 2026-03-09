@@ -68,10 +68,12 @@ class LevelBuilderViewModel: ObservableObject {
     @Published var whiteDots: [SudokuLevel.KropkiDot] = []
     @Published var blackDots: [SudokuLevel.KropkiDot] = []
     
-    // MARK: - Sequential Tap Drawing State (Req 1)
+    // MARK: - Sequential Tap Drawing State
     @Published var currentShapePath: [Int] = []
     var isShapeInProgress: Bool { !currentShapePath.isEmpty }
     @Published var showInvalidTapFeedback: Bool = false
+    @Published var showCageSumPrompt: Bool = false
+    @Published var pendingCageSum: String = ""
     
     // MARK: - Kropki Placement State (Req 4)
     @Published var kropkiFirstCell: Int? = nil
@@ -84,7 +86,7 @@ class LevelBuilderViewModel: ObservableObject {
         case erase
         case thermo
         case arrow
-        case cage(Int)
+        case cage
         case whiteDot
         case blackDot
         case oddEven(String)
@@ -215,19 +217,32 @@ class LevelBuilderViewModel: ObservableObject {
         case .thermo:
             let pathCoords = currentShapePath.map { [$0 / 9, $0 % 9] }
             thermoPaths.append(pathCoords)
+            currentShapePath.removeAll()
         case .arrow:
             let bulb = [currentShapePath[0] / 9, currentShapePath[0] % 9]
             let lineCoords = currentShapePath.dropFirst().map { [$0 / 9, $0 % 9] }
             let arrow = SudokuLevel.Arrow(bulb: bulb, line: lineCoords)
             arrows.append(arrow)
-        case .cage(let sum):
-            let cellsCoords = currentShapePath.map { [$0 / 9, $0 % 9] }
-            let cage = SudokuLevel.Cage(sum: sum, cells: cellsCoords)
-            cages.append(cage)
+            currentShapePath.removeAll()
+        case .cage:
+            // Show sum prompt — don't clear path yet
+            pendingCageSum = ""
+            showCageSumPrompt = true
         default:
-            break
+            currentShapePath.removeAll()
         }
-        
+    }
+    
+    /// Called after user enters cage sum in the alert
+    func commitCageWithSum() {
+        let sum = Int(pendingCageSum) ?? 0
+        guard sum > 0, currentShapePath.count > 1 else {
+            currentShapePath.removeAll()
+            return
+        }
+        let cellsCoords = currentShapePath.map { [$0 / 9, $0 % 9] }
+        let cage = SudokuLevel.Cage(sum: sum, cells: cellsCoords)
+        cages.append(cage)
         currentShapePath.removeAll()
     }
     
@@ -277,6 +292,8 @@ class LevelBuilderViewModel: ObservableObject {
         switch tool {
         case .thermo:
             return isNonConsecutive ? 5 : 9
+        case .arrow:
+            return 10 // 1 head + max 9 body cells (sum ≤ 9)
         default:
             return 81
         }

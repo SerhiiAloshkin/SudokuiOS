@@ -118,7 +118,7 @@ struct CustomLevelsListView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            navigationStack.append(.customGame(level.id))
+            navigationStack.append(.customGame(level))
         }
         .padding(.vertical, 4)
     }
