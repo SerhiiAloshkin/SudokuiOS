@@ -339,24 +339,7 @@ extension LevelSelectionView {
     }
     
     private func handleLevelTap(_ level: SudokuLevel) {
-        if level.isLocked {
-            if level.id == 251 {
-                // Gatekeeper Interception
-                showGatekeeperAlert = true
-            } else if level.id <= 250 && !level.isSolved {
-                // Ad Unlock Logic for 1-250
-                selectedLevelForPreview = level
-            } else {
-                // Strictly Locked (Barrier > 250, but not 251 specifically)
-                // or just default prevention, OR allow preview to see "Locked" state?
-                // Logic says: if locked, show preview which handles ads/locks?
-                // But specifically for > 250, we might want to allow "seeing" it but it's locked.
-                // Replicating original logic:
-                selectedLevelForPreview = level
-            }
-        } else {
-            selectedLevelForPreview = level
-        }
+        selectedLevelForPreview = level
     }
 }
 
