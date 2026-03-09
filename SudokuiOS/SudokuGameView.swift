@@ -216,6 +216,12 @@ struct SudokuGameView: View {
     
     // MARK: - Subviews
     
+    enum CellDrawLayer {
+        case background
+        case cross
+        case content
+    }
+    
     struct SudokuCellView: View {
         @Bindable var cell: SudokuCellModel
         let highlightType: SudokuGameViewModel.CellHighlightType
@@ -224,6 +230,8 @@ struct SudokuGameView: View {
         var isKiller: Bool = false
         var isNoteHighlightEnabled: Bool = true // New property
         var cellSize: CGFloat
+        var drawLayer: CellDrawLayer = .background // Layer selector
+        
         
         // Wave Effect Props
         var waveOrigin: Int? = nil
@@ -257,46 +265,52 @@ struct SudokuGameView: View {
         
         var body: some View {
             ZStack {
-                // 1. Background
-                Rectangle()
-                    .fill(baseColor)
-                
-                // 2. Highlight Overlay
-                if highlightType == .sameNoteAndRelating {
-                    // Render BOTH overlays to physically merge the colors
+                if drawLayer == .background {
+                    // 1. Background
                     Rectangle()
-                        .fill(Color("RestrictionHighlight").opacity(colorScheme == .light ? 0.50 : 0.35))
-                    Rectangle()
-                        .fill(colorScheme == .light ? Color.teal.opacity(0.25) : Color.teal.opacity(0.3))
-                } else if let overlay = overlayColor {
-                    Rectangle()
-                        .fill(overlay)
-                }
-                
-                // 3. Content
-                if cell.value != 0 {
-                    Text("\(cell.value)")
-                        .font(.system(size: cellSize * 0.7, weight: isError ? .bold : .medium, design: .rounded))
-                        .foregroundColor(cell.isClue ? .primary : (isError ? .red : Color("PlayerNumberColor")))
-                } else if !cell.notes.isEmpty {
-                    noteGrid
-                }
-                
-                // 3.5 Cross Overlay
-                if cell.hasCross {
-                    Image(systemName: "multiply")
-                        .font(.system(size: cellSize * 0.6, weight: .light))
-                        .foregroundColor(.gray.opacity(0.8))
+                        .fill(baseColor)
+                    
+                    // 2. Highlight Overlay
+                    if highlightType == .sameNoteAndRelating {
+                        // Render BOTH overlays to physically merge the colors
+                        Rectangle()
+                            .fill(Color("RestrictionHighlight").opacity(colorScheme == .light ? 0.50 : 0.35))
+                        Rectangle()
+                            .fill(colorScheme == .light ? Color.teal.opacity(0.25) : Color.teal.opacity(0.3))
+                    } else if let overlay = overlayColor {
+                        Rectangle()
+                            .fill(overlay)
+                    }
+                } else if drawLayer == .content {
+                    // 3. Content
+                    if cell.value != 0 {
+                        Text("\(cell.value)")
+                            .font(.system(size: cellSize * 0.7, weight: isError ? .bold : .medium, design: .rounded))
+                            .foregroundColor(cell.isClue ? .primary : (isError ? .red : Color("PlayerNumberColor")))
+                    } else if !cell.notes.isEmpty {
+                        noteGrid
+                    }
+                } else if drawLayer == .cross {
+                    // 3.5 Cross Overlay
+                    if cell.hasCross {
+                        Image(systemName: "multiply")
+                            .font(.system(size: cellSize * 0.6, weight: .light))
+                            .foregroundColor(.gray.opacity(0.8))
+                    }
                 }
             }
             .overlay(
-                Rectangle()
-                    .strokeBorder(Color.gray.opacity(0.5), lineWidth: 0.5)
+                Group {
+                    if drawLayer == .background {
+                        Rectangle()
+                            .strokeBorder(Color.gray.opacity(0.5), lineWidth: 0.5)
+                    }
+                }
             )
             .aspectRatio(1, contentMode: .fit)
             .clipped()
             .modifier(WaveEffect(index: cell.id, origin: waveOrigin, radius: waveRadius))
-            .id("\(cell.id)-\(cell.value)-\(cell.color ?? -1)-\(cell.hasCross)")
+            .id("\(cell.id)-\(cell.value)-\(cell.color ?? -1)-\(cell.hasCross)-\(drawLayer)")
         }
         
         // Extracted Note Grid to separate property
@@ -1020,12 +1034,7 @@ struct SudokuGameView: View {
                         ZStack {
                             Color(UIColor.systemBackground) // Grid background
                             
-                            // OddEvenLayer moved to .overlay below to ensure it renders ON TOP of cell selection fills
-                            
-                            if let arrows = gameViewModel.arrows {
-                                ArrowDrawingView(arrows: arrows)
-                            }
-                            
+                            // 1. Background Layer (Cells + Highlights)
                             LazyVGrid(columns: columns, spacing: 0) {
                                 ForEach(gameViewModel.cells) { cell in
                                     SudokuGameView.SudokuCellView(
@@ -1036,6 +1045,7 @@ struct SudokuGameView: View {
                                         isKiller: gameViewModel.cages != nil,
                                         isNoteHighlightEnabled: gameViewModel.settings?.isHighlightSameNoteEnabled ?? true,
                                         cellSize: cellSize,
+                                        drawLayer: .background,
                                         waveOrigin: gameViewModel.waveOrigin,
                                         waveRadius: gameViewModel.waveRadius
                                     )
@@ -1043,22 +1053,24 @@ struct SudokuGameView: View {
                                 }
                             }
                             .id(gameViewModel.boardID)
+                            .zIndex(1)
                             
-                            if let cages = gameViewModel.cages {
-                                KillerCageLayer(cages: cages)
-                            }
-                        }
-                        .overlay(
+                            // 2. Lines & Overlays Layer
                             Group {
                                 if let parity = gameViewModel.parityOverlay {
                                     OddEvenLayer(parityString: parity, cellSize: cellSize)
                                 }
-                            }
-                        )
-                        .overlay(ThermoOverlay(paths: gameViewModel.thermoPaths))
-                        .overlay(SudokuBoardOverlay())
-                        .overlay(
-                            Group {
+                                
+                                if let arrows = gameViewModel.arrows {
+                                    ArrowDrawingView(arrows: arrows)
+                                }
+                                
+                                ThermoOverlay(paths: gameViewModel.thermoPaths)
+                                
+                                if let cages = gameViewModel.cages {
+                                    KillerCageLayer(cages: cages)
+                                }
+                                
                                 if (gameViewModel.whiteDots != nil || gameViewModel.blackDots != nil) {
                                     KropkiLayer(
                                         whiteDots: gameViewModel.whiteDots ?? [],
@@ -1067,8 +1079,48 @@ struct SudokuGameView: View {
                                         backgroundColor: Color(uiColor: .systemBackground)
                                     )
                                 }
+                                
+                                SudokuBoardOverlay()
                             }
-                        )
+                            .zIndex(2)
+                            
+                            // 3. Sandwich Cross Layer
+                            LazyVGrid(columns: columns, spacing: 0) {
+                                ForEach(gameViewModel.cells) { cell in
+                                    SudokuGameView.SudokuCellView(
+                                        cell: cell,
+                                        highlightType: .none,
+                                        isError: false,
+                                        cellSize: cellSize,
+                                        drawLayer: .cross,
+                                        waveOrigin: gameViewModel.waveOrigin,
+                                        waveRadius: gameViewModel.waveRadius
+                                    )
+                                    .frame(height: cellSize)
+                                }
+                            }
+                            .id("\(gameViewModel.boardID)-cross")
+                            .zIndex(3)
+                            
+                            // 4. Content (Notes & Numbers) Layer
+                            LazyVGrid(columns: columns, spacing: 0) {
+                                ForEach(gameViewModel.cells) { cell in
+                                    SudokuGameView.SudokuCellView(
+                                        cell: cell,
+                                        highlightType: .none,
+                                        isError: gameViewModel.shouldShowMistake(at: cell.id),
+                                        isKiller: gameViewModel.cages != nil,
+                                        cellSize: cellSize,
+                                        drawLayer: .content,
+                                        waveOrigin: gameViewModel.waveOrigin,
+                                        waveRadius: gameViewModel.waveRadius
+                                    )
+                                    .frame(height: cellSize)
+                                }
+                            }
+                            .id("\(gameViewModel.boardID)-content")
+                            .zIndex(4)
+                        }
                         .clipped()
                         // Restore Border: Primary color, 2pt width
                         .border(Color.primary, width: 2)
