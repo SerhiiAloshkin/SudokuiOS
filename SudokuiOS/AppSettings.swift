@@ -71,6 +71,18 @@ final class AppSettings {
         set { UserDefaults.standard.set(newValue, forKey: "nextHintAvailableDate") }
     }
     
+    // Bridge to UserDefaults for Mistake Limit
+    var isMistakeLimitEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "isMistakeLimitEnabled") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "isMistakeLimitEnabled") }
+    }
+    
+    // Bridge to UserDefaults for Show Hint Button
+    var showHintButton: Bool {
+        get { UserDefaults.standard.object(forKey: "showHintButton") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "showHintButton") }
+    }
+    
     var highlightMode: HighlightMode {
         get { HighlightMode(rawValue: highlightModeRaw) ?? .restriction }
         set { highlightModeRaw = newValue.rawValue }

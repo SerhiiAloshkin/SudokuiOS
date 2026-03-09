@@ -73,6 +73,16 @@ struct LevelPreviewModal: View {
                                 .fontWeight(.semibold)
                         }
                         
+                        if level.mistakesMade == 0 {
+                            Text("✨ Perfect Run ✨")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        } else {
+                            Text("Mistakes: \(level.mistakesMade)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
                         if level.bestTime > 0 {
                             HStack {
                                 Image(systemName: "trophy.fill")

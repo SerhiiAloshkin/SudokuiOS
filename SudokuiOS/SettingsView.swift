@@ -18,6 +18,8 @@ struct SettingsView: View {
     @State private var showMailFallbackAlert = false
     
     @AppStorage("hintAppliesToSelectedCell") private var hintAppliesToSelectedCell: Bool = false
+    @AppStorage("isMistakeLimitEnabled") private var isMistakeLimitEnabled: Bool = true
+    @AppStorage("showHintButton") private var showHintButton: Bool = true
     
     private let supportEmail = "help.sudokuversa@gmail.com"
     
@@ -70,6 +72,9 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    
+                    Toggle("Enable Mistake Limit (3 Strikes)", isOn: $isMistakeLimitEnabled)
+                    Toggle("Show Hint Button", isOn: $showHintButton)
                     
                     Toggle("Disable Completed Digits", isOn: $settings.isDisableCompletedDigitsEnabled)
                     Toggle("Show Combination Helpers", isOn: $settings.isCombinationHelperEnabled)

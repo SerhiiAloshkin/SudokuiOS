@@ -102,6 +102,7 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
     var bestTime: Double = 0.0
     var lastSolvedTime: Double = 0.0
     var isPerfect: Bool = false
+    var mistakesMade: Int = 0
     
     enum CodingKeys: String, CodingKey {
         case id, board, clues, solution, difficulty, ruleType, variant, types, rowClues, colClues, sandwich_clues, thermoPaths, arrows, cages, white_dots, black_dots, negative_constraint, parity
@@ -376,6 +377,7 @@ class LevelViewModel: ObservableObject {
                     // Fallback for legacy solved levels: use bestTime as lastSolvedTime if it's missing
                     levels[index].lastSolvedTime = (progress.lastSolvedTime == 0 && progress.isSolved) ? progress.bestTime : progress.lastSolvedTime
                     levels[index].isPerfect = progress.isPerfect
+                    levels[index].mistakesMade = progress.mistakesMade
                     levels[index].isAdUnlocked = progress.isAdUnlocked
                     levels[index].isUnlocked = progress.isUnlocked // Persistent Sticky Unlock
                 }
@@ -469,12 +471,13 @@ class LevelViewModel: ObservableObject {
     //     }
     // }
     
-    func saveProgress(levelId: Int, timeElapsed: Int, isPerfect: Bool = false) {
+    func saveProgress(levelId: Int, timeElapsed: Int, isPerfect: Bool = false, mistakesMade: Int = 0) {
         // 1. Update In-Memory
         let newTime = Double(timeElapsed)
         if let index = levels.firstIndex(where: { $0.id == levelId }) {
             levels[index].isSolved = true
             levels[index].lastSolvedTime = newTime
+            levels[index].mistakesMade = mistakesMade
             
             // Only update isPerfect if the current run is perfect
             if isPerfect {
@@ -501,8 +504,11 @@ class LevelViewModel: ObservableObject {
             if progress.bestTime == 0 || newTime < progress.bestTime {
                 progress.bestTime = newTime
             }
+            // Avoid un-perfecting a previously perfect level? 
+            // The prompt says "pass final mistakesCount". We will update the latest count here:
+            progress.mistakesMade = mistakesMade
         } else {
-            let newProgress = UserLevelProgress(levelID: levelId, isSolved: true, bestTime: newTime, isPerfect: isPerfect)
+            let newProgress = UserLevelProgress(levelID: levelId, isSolved: true, bestTime: newTime, isPerfect: isPerfect, mistakesMade: mistakesMade)
             newProgress.lastSolvedTime = newTime
             context.insert(newProgress)
         }
@@ -680,12 +686,13 @@ class LevelViewModel: ObservableObject {
         }
     }
 
-    func levelSolved(id: Int, timeElapsed: Int, isPerfect: Bool = false) {
+    func levelSolved(id: Int, timeElapsed: Int, isPerfect: Bool = false, mistakesMade: Int = 0) {
         // Unlock Logic 
         // 1. Mark Current Level as Solved & Save Progress
         if let index = levels.firstIndex(where: { $0.id == id }) {
             levels[index].isSolved = true
-            saveProgress(levelId: id, timeElapsed: timeElapsed, isPerfect: isPerfect)
+            levels[index].mistakesMade = mistakesMade
+            saveProgress(levelId: id, timeElapsed: timeElapsed, isPerfect: isPerfect, mistakesMade: mistakesMade)
             
             // Unlock Next Level (Sequential)
             let nextID = id + 1

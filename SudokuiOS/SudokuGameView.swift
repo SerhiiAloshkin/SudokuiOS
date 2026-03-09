@@ -95,6 +95,7 @@ struct SudokuGameView: View {
                         currentLevelID: gameViewModel.levelID,
                         nextLevelID: nextID,
                         nextLevelVariant: nextVariant,
+                        mistakesMade: gameViewModel.mistakesCount,
                         adCoordinator: adCoordinator, // Pass Coordinator
                         onNextLevel: {
                             // Navigation Only (Ad handled by Overlay)
@@ -663,12 +664,14 @@ struct SudokuGameView: View {
             ZStack(alignment: .top) {
                 // Left-aligned Hint Button
                 HStack {
-                    HintButtonView(
-                        gameViewModel: gameViewModel,
-                        storeManager: storeManager,
-                        adCoordinator: adCoordinator
-                    )
-                    .padding(.leading)
+                    if settings.showHintButton {
+                        HintButtonView(
+                            gameViewModel: gameViewModel,
+                            storeManager: storeManager,
+                            adCoordinator: adCoordinator
+                        )
+                        .padding(.leading)
+                    }
                     
                     Spacer()
                 }

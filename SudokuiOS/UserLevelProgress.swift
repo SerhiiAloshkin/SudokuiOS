@@ -21,8 +21,9 @@ final class UserLevelProgress {
     
     @Relationship(deleteRule: .cascade, inverse: \MoveHistory.levelProgress)
     var moves: [MoveHistory]? = []
+    var mistakesMade: Int = 0
     
-    init(levelID: Int, isSolved: Bool = false, bestTime: Double = 0.0, currentUserBoard: String? = nil, notesData: Data? = nil, colorData: Data? = nil, markedCombinationsData: Data? = nil, killerMarkedCombinationsData: Data? = nil, crossData: Data? = nil, isAdUnlocked: Bool = false, isUnlocked: Bool = false, timeElapsed: Int = 0, isPerfect: Bool = false) {
+    init(levelID: Int, isSolved: Bool = false, bestTime: Double = 0.0, currentUserBoard: String? = nil, notesData: Data? = nil, colorData: Data? = nil, markedCombinationsData: Data? = nil, killerMarkedCombinationsData: Data? = nil, crossData: Data? = nil, isAdUnlocked: Bool = false, isUnlocked: Bool = false, timeElapsed: Int = 0, isPerfect: Bool = false, mistakesMade: Int = 0) {
         self.levelID = levelID
         self.isSolved = isSolved
         self.bestTime = bestTime
@@ -37,6 +38,7 @@ final class UserLevelProgress {
         self.timeElapsed = timeElapsed
         self.lastSolvedTime = 0.0
         self.isPerfect = isPerfect
+        self.mistakesMade = mistakesMade
         self.moves = []
     }
 }

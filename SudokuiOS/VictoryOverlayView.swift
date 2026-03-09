@@ -7,6 +7,7 @@ struct VictoryOverlayView: View {
     let currentLevelID: Int
     let nextLevelID: Int
     let nextLevelVariant: SudokuRuleType
+    let mistakesMade: Int
     @ObservedObject var adCoordinator: AdCoordinator // Injected Dependency
     let onNextLevel: () -> Void
     let onDismiss: () -> Void
@@ -47,6 +48,16 @@ struct VictoryOverlayView: View {
                         )
                     )
                     .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 5)
+                    
+                if mistakesMade == 0 {
+                    Text("✨ Perfect Game! 0 Mistakes ✨")
+                        .font(.headline)
+                        .foregroundColor(.green)
+                } else {
+                    Text("Mistakes: \(mistakesMade)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
                 
                 // 3. Time Stats
                 VStack(spacing: 8) {
@@ -257,6 +268,7 @@ struct VictoryOverlayView: View {
         currentLevelID: 14,
         nextLevelID: 15,
         nextLevelVariant: .oddEven,
+        mistakesMade: 0,
         adCoordinator: AdCoordinator(), // Mock
         onNextLevel: {},
         onDismiss: {}

@@ -865,8 +865,8 @@ class SudokuGameViewModel: ObservableObject {
                 addMove(cellIndex: index, moveType: "Value", oldValue: oldValue, newValue: newValue, batchID: batchID, performSave: false)
                 
                 // --- Mistake Check Logic ---
-                let mode = settings?.mistakeMode ?? .immediate
-                if targetValue != 0 && mode == .immediate {
+                let isLimitEnabled = settings?.isMistakeLimitEnabled ?? true
+                if targetValue != 0 && isLimitEnabled {
                     let isIncorrect = targetValue != solutionArray[index]
                     if isIncorrect {
                         // It's a mistake!
@@ -881,7 +881,7 @@ class SudokuGameViewModel: ObservableObject {
                         }
                         
                         // We do NOT stop entering the value, it still gets placed
-                        // The UI will highlight it as red because isMistake(at:) returns true.
+                        // The UI will highlight it as red depending on the mistakeMode setting.
                     }
                 }
                 // ---------------------------
@@ -1345,7 +1345,7 @@ class SudokuGameViewModel: ObservableObject {
         }
         
         let isPerfect = (mistakesCount == 0 && hintsUsed == 0)
-        parentViewModel.levelSolved(id: levelID, timeElapsed: timeElapsed, isPerfect: isPerfect)
+        parentViewModel.levelSolved(id: levelID, timeElapsed: timeElapsed, isPerfect: isPerfect, mistakesMade: mistakesCount)
         
         // Clear Last Unfinished Level
         UserDefaults.standard.set(-1, forKey: "lastUnfinishedLevelID")
