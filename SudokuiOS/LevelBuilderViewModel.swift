@@ -61,12 +61,12 @@ class LevelBuilderViewModel: ObservableObject {
     @Published var isValidating: Bool = false
     @Published var validationResult: String? = nil
     
-    // MARK: - Board Rules Data
-    var arrows: [SudokuLevel.Arrow] = []
-    var thermoPaths: [[[Int]]] = []
-    var cages: [SudokuLevel.Cage] = []
-    var whiteDots: [SudokuLevel.KropkiDot] = []
-    var blackDots: [SudokuLevel.KropkiDot] = []
+    // MARK: - Board Rules Data (Published for UI reactivity)
+    @Published var arrows: [SudokuLevel.Arrow] = []
+    @Published var thermoPaths: [[[Int]]] = []
+    @Published var cages: [SudokuLevel.Cage] = []
+    @Published var whiteDots: [SudokuLevel.KropkiDot] = []
+    @Published var blackDots: [SudokuLevel.KropkiDot] = []
     
     // MARK: - Sequential Tap Drawing State (Req 1)
     @Published var currentShapePath: [Int] = []
@@ -156,13 +156,16 @@ class LevelBuilderViewModel: ObservableObject {
             if placedCount < 9 {
                 cells[cellId].value = number
                 cells[cellId].isClue = true
+                objectWillChange.send()
             }
         case .erase:
             cells[cellId].value = 0
             cells[cellId].isClue = false
             cells[cellId].parity = nil
+            objectWillChange.send()
         case .oddEven(let parity):
             cells[cellId].parity = parity
+            objectWillChange.send()
         case .thermo, .arrow, .cage:
             handleShapeTap(cellId)
         case .whiteDot, .blackDot:
@@ -305,7 +308,13 @@ class LevelBuilderViewModel: ObservableObject {
             rule = .classic
         }
         
-        return CustomSudokuLevel(
+        // Build parity string
+        let parityString = cells.map { cell -> String in
+            return cell.parity ?? "0"
+        }.joined()
+        let parityData = parityString.contains(where: { $0 != "0" }) ? parityString.data(using: .utf8) : nil
+        
+        let level = CustomSudokuLevel(
             id: editingLevelID ?? UUID(),
             board: boardString,
             difficulty: "Custom",
@@ -319,6 +328,8 @@ class LevelBuilderViewModel: ObservableObject {
             whiteDotsData: try? JSONEncoder().encode(whiteDots),
             blackDotsData: try? JSONEncoder().encode(blackDots)
         )
+        level.parityData = parityData
+        return level
     }
     
     func saveLevel(context: ModelContext) {

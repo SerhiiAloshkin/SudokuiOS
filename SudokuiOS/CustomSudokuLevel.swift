@@ -76,4 +76,110 @@ final class CustomSudokuLevel: Identifiable {
         self.sandwichRowCluesData = sandwichRowCluesData
         self.sandwichColCluesData = sandwichColCluesData
     }
+    
+    // MARK: - Parity Data (for Odd/Even)
+    var parityData: Data? = nil
+    
+    // MARK: - Adapter: CustomSudokuLevel → SudokuLevel
+    
+    func toSudokuLevel() -> SudokuLevel {
+        // Determine primary rule type
+        var primaryRule: SudokuRuleType = ruleType
+        var typesArray: [SudokuRuleType] = []
+        
+        // Build types array from toggle flags
+        if isNonConsecutive {
+            typesArray.append(.nonConsecutive)
+            primaryRule = .nonConsecutive
+        }
+        if isKing {
+            typesArray.append(.king)
+            if primaryRule == .classic { primaryRule = .king }
+        }
+        if isKnight {
+            typesArray.append(.knight)
+            if primaryRule == .classic { primaryRule = .knight }
+        }
+        
+        // Decode variant data
+        let thermos: [[[Int]]]? = {
+            guard let data = thermoPathsData else { return nil }
+            return try? JSONDecoder().decode([[[Int]]].self, from: data)
+        }()
+        
+        let arrowsList: [SudokuLevel.Arrow]? = {
+            guard let data = arrowsData else { return nil }
+            return try? JSONDecoder().decode([SudokuLevel.Arrow].self, from: data)
+        }()
+        
+        let cagesList: [SudokuLevel.Cage]? = {
+            guard let data = cagesData else { return nil }
+            return try? JSONDecoder().decode([SudokuLevel.Cage].self, from: data)
+        }()
+        
+        let whiteDotsList: [SudokuLevel.KropkiDot]? = {
+            guard let data = whiteDotsData else { return nil }
+            return try? JSONDecoder().decode([SudokuLevel.KropkiDot].self, from: data)
+        }()
+        
+        let blackDotsList: [SudokuLevel.KropkiDot]? = {
+            guard let data = blackDotsData else { return nil }
+            return try? JSONDecoder().decode([SudokuLevel.KropkiDot].self, from: data)
+        }()
+        
+        let rowClues: [Int]? = {
+            guard let data = sandwichRowCluesData else { return nil }
+            return try? JSONDecoder().decode([Int].self, from: data)
+        }()
+        
+        let colClues: [Int]? = {
+            guard let data = sandwichColCluesData else { return nil }
+            return try? JSONDecoder().decode([Int].self, from: data)
+        }()
+        
+        // Build parity string from parityData
+        let parityString: String? = {
+            guard let data = parityData else { return nil }
+            return String(data: data, encoding: .utf8)
+        }()
+        
+        // Add variant-specific primary rules based on data presence
+        if thermos != nil && !thermos!.isEmpty && !typesArray.contains(.thermo) {
+            typesArray.append(.thermo)
+        }
+        if arrowsList != nil && !arrowsList!.isEmpty && !typesArray.contains(.arrow) {
+            typesArray.append(.arrow)
+        }
+        if cagesList != nil && !cagesList!.isEmpty && !typesArray.contains(.killer) {
+            typesArray.append(.killer)
+        }
+        if (whiteDotsList != nil || blackDotsList != nil) && !typesArray.contains(.kropki) {
+            typesArray.append(.kropki)
+        }
+        if parityString != nil && !typesArray.contains(.oddEven) {
+            typesArray.append(.oddEven)
+        }
+        
+        var level = SudokuLevel(
+            id: -1,  // Custom levels use negative/special IDs
+            isLocked: false,
+            isSolved: isSolved,
+            board: board,
+            solution: solution,
+            difficulty: difficulty,
+            ruleType: primaryRule
+        )
+        
+        level.types = typesArray
+        level.thermoPaths = thermos
+        level.arrows = arrowsList
+        level.cages = cagesList
+        level.white_dots = whiteDotsList
+        level.black_dots = blackDotsList
+        level.rowClues = rowClues
+        level.colClues = colClues
+        level.parity = parityString
+        
+        return level
+    }
 }
