@@ -561,31 +561,28 @@ struct SudokuGameView: View {
                 }
             }) {
                 ZStack {
-                    if storeManager.isAdsRemoved {
-                        // Premium User State
-                        if gameViewModel.hintCooldownRemaining > 0 {
-                            // Cooldown Active
-                            Text("\(gameViewModel.hintCooldownRemaining / 60):\(String(format: "%02d", gameViewModel.hintCooldownRemaining % 60))")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                .foregroundColor(.orange)
-                                .frame(width: 32, height: 24) // Extra width for text if needed, but fixed height
-                        } else {
+                    if gameViewModel.hintCooldownRemaining > 0 {
+                        // Cooldown Active (Universal)
+                        Text("\(gameViewModel.hintCooldownRemaining / 60):\(String(format: "%02d", gameViewModel.hintCooldownRemaining % 60))")
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundColor(.orange)
+                            .frame(width: 38, height: 24) // Extra width to fit "00:00" format perfectly
+                    } else if gameViewModel.isRewardedAdLoading {
+                        // Loading Ad (Free Users Only)
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                            .scaleEffect(0.9)
+                            .frame(width: 24, height: 24)
+                    } else {
+                        // Ready State
+                        if storeManager.isAdsRemoved {
                             // Ready to Hint (Premium)
                             Image(systemName: "lightbulb.fill")
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundColor(.primary)
                                 .frame(width: 24, height: 24)
-                        }
-                    } else {
-                        // Free User State
-                        if gameViewModel.isRewardedAdLoading {
-                            // Loading Ad
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .purple))
-                                .scaleEffect(0.9)
-                                .frame(width: 24, height: 24)
                         } else {
-                            // Ready for Ad
+                            // Ready for Ad (Free)
                             ZStack(alignment: .bottomTrailing) {
                                 Image(systemName: "lightbulb.fill")
                                     .font(.system(size: 18, weight: .semibold))

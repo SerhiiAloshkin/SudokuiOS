@@ -248,6 +248,9 @@ class SudokuGameViewModel: ObservableObject {
         // Track Last Unfinished Level
         UserDefaults.standard.set(levelID, forKey: "lastUnfinishedLevelID")
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastPlayedTimestamp")
+        
+        // Resume any active hint cooldown
+        startHintCooldownTimer()
     }
     
     private func loadLevelData() {
@@ -1513,16 +1516,15 @@ class SudokuGameViewModel: ObservableObject {
             }
             self.enterNumber(correctValue)
             
-            // Restore state
             self.isNoteMode = wasNoteMode
             // Keep the cell selected for convenience
             // self.selectedIndices = []
         }
         
         if storeManager.isAdsRemoved {
-            // Premium Cooldown (3 minutes = 180 seconds)
+            // Premium Cooldown (5 minutes = 300 seconds)
             applyHint()
-            startHintCooldown()
+            startPersistentHintCooldown()
         } else {
             // Rewarded Ad
             self.isRewardedAdLoading = true
@@ -1531,27 +1533,48 @@ class SudokuGameViewModel: ObservableObject {
                     self.isRewardedAdLoading = false
                     if success {
                         applyHint()
+                        self.startPersistentHintCooldown() // 5 minute persistent cooldown for all users
                     }
                 }
             }
         }
     }
     
-    private func startHintCooldown() {
+    private func startPersistentHintCooldown() {
+        let duration: TimeInterval = 300 // 5 minutes
+        let targetDate = Date().addingTimeInterval(duration)
+        UserDefaults.standard.set(targetDate, forKey: "nextHintAvailableDate")
+        startHintCooldownTimer()
+    }
+    
+    private func startHintCooldownTimer() {
         hintCooldownTimer?.invalidate()
-        hintCooldownRemaining = 180 // 3 minutes
-        hintCooldownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
-            guard let self = self else {
-                timer.invalidate()
-                return
-            }
+        
+        // Initial check
+        updateCooldownRemaining()
+        guard hintCooldownRemaining > 0 else { return }
+        
+        hintCooldownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             DispatchQueue.main.async {
-                if self.hintCooldownRemaining > 0 {
-                    self.hintCooldownRemaining -= 1
-                } else {
-                    timer.invalidate()
-                }
+                self?.updateCooldownRemaining()
             }
+        }
+    }
+    
+    private func updateCooldownRemaining() {
+        guard let targetDate = UserDefaults.standard.object(forKey: "nextHintAvailableDate") as? Date else {
+            hintCooldownRemaining = 0
+            hintCooldownTimer?.invalidate()
+            return
+        }
+        
+        let remaining = Int(targetDate.timeIntervalSinceNow)
+        if remaining > 0 {
+            hintCooldownRemaining = remaining
+        } else {
+            hintCooldownRemaining = 0
+            hintCooldownTimer?.invalidate()
+            UserDefaults.standard.removeObject(forKey: "nextHintAvailableDate")
         }
     }
     
@@ -2369,9 +2392,7 @@ class SudokuGameViewModel: ObservableObject {
             self.mistakesCount = 0
             self.hintsUsed = 0
             self.isGameOver = false
-            self.hintCooldownRemaining = 0
-            self.hintCooldownTimer?.invalidate()
-            
+            self.startHintCooldownTimer() // Ensure it continues running if active            
             // Reset Board
             if let level = parentViewModel.levels.first(where: { $0.id == levelID }) {
                 // Restore original board (ignoring progress)

@@ -65,6 +65,12 @@ final class AppSettings {
         set { UserDefaults.standard.set(newValue, forKey: "hintAppliesToSelectedCell") }
     }
     
+    // Bridge to UserDefaults for Persistent Hint Cooldown
+    var nextHintAvailableDate: Date? {
+        get { UserDefaults.standard.object(forKey: "nextHintAvailableDate") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "nextHintAvailableDate") }
+    }
+    
     var highlightMode: HighlightMode {
         get { HighlightMode(rawValue: highlightModeRaw) ?? .restriction }
         set { highlightModeRaw = newValue.rawValue }
