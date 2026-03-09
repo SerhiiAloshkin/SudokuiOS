@@ -3,41 +3,40 @@ import SwiftData
 
 struct LevelBuilderView: View {
     @Binding var navigationStack: [MainMenuView.SudokuRoute]
-    @StateObject private var viewModel = LevelBuilderViewModel()
+    @StateObject private var viewModel: LevelBuilderViewModel
     @Environment(\.modelContext) private var modelContext
     
-    // Grid Setup
     let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 9)
     @State private var showingAlert = false
+    
+    // Support both new and edit modes
+    init(navigationStack: Binding<[MainMenuView.SudokuRoute]>, existingLevel: CustomSudokuLevel? = nil) {
+        _navigationStack = navigationStack
+        if let level = existingLevel {
+            _viewModel = StateObject(wrappedValue: LevelBuilderViewModel(existingLevel: level))
+        } else {
+            _viewModel = StateObject(wrappedValue: LevelBuilderViewModel())
+        }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
             headerView
-            globalRulesPicker
-            validationControls
+            globalRulesToggles
             toolPalette
+            contextualPalette
             
-            // Contextual Palette options (Fixed Height Container to prevent layout jump)
-            ZStack {
-                if isDigitTool {
-                    digitPicker
-                } else if isCageTool {
-                    cageSumPicker
-                } else if isOddEvenTool {
-                    oddEvenPicker
-                }
-            }
-            .frame(height: 50)
-            
-            Spacer(minLength: 16)
+            Spacer(minLength: 8)
             
             gridMatrix
+            
+            Spacer(minLength: 8)
+            
+            bottomControls
         }
         .navigationBarHidden(true)
         .onChange(of: viewModel.validationResult) { _, result in
-            if result != nil {
-                showingAlert = true
-            }
+            if result != nil { showingAlert = true }
         }
         .alert("Status", isPresented: $showingAlert, presenting: viewModel.validationResult) { _ in
             Button("OK") {
@@ -49,156 +48,177 @@ struct LevelBuilderView: View {
         } message: { result in
             Text(result)
         }
+        .sensoryFeedback(.warning, trigger: viewModel.showInvalidTapFeedback)
     }
     
-    // MARK: - Subviews
+    // MARK: - Header
     
     private var headerView: some View {
         HStack {
-            Button(action: {
-                navigationStack.removeLast()
-            }) {
+            Button(action: { navigationStack.removeLast() }) {
                 Image(systemName: "chevron.left")
                     .font(.title2)
                     .foregroundColor(.primary)
             }
-            
             Spacer()
-            
-            Text("Level Builder")
-                .font(.headline)
-            
+            Text("Level Builder").font(.headline)
             Spacer()
-            
-            Button(action: {
-                viewModel.saveLevel(context: modelContext)
-            }) {
-                Text("Save")
-                    .fontWeight(.bold)
+            Button(action: { viewModel.saveLevel(context: modelContext) }) {
+                Text("Save").fontWeight(.bold)
             }
         }
         .padding()
     }
     
-    private var globalRulesPicker: some View {
-        Picker("Base Board", selection: $viewModel.boardBaseType) {
-            ForEach(LevelBuilderViewModel.BoardBaseType.allCases, id: \.self) { type in
-                Text(type.rawValue).tag(type)
+    // MARK: - Multi-Select Global Rules (Req 2)
+    
+    private var globalRulesToggles: some View {
+        HStack(spacing: 8) {
+            ForEach(LevelBuilderViewModel.GlobalRule.allCases, id: \.self) { rule in
+                ruleToggleButton(rule)
             }
         }
-        .pickerStyle(SegmentedPickerStyle())
         .padding(.horizontal)
-        .padding(.bottom, 10)
+        .padding(.bottom, 8)
     }
     
-    private var validationControls: some View {
-        HStack(spacing: 20) {
-            Button(action: {
-                viewModel.checkValidation()
-            }) {
+    @ViewBuilder
+    private func ruleToggleButton(_ rule: LevelBuilderViewModel.GlobalRule) -> some View {
+        let isActive = viewModel.isRuleActive(rule)
+        Button(action: { viewModel.toggleRule(rule) }) {
+            Text(rule.rawValue)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(isActive ? Color.blue : Color.clear)
+                )
+                .foregroundColor(isActive ? .white : .primary)
+                .overlay(Capsule().stroke(Color.gray.opacity(0.4), lineWidth: 1))
+        }
+    }
+    
+    // MARK: - Tool Palette
+    
+    private var toolPalette: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                BuilderToolButton(icon: "eraser", label: "Erase", isSelected: viewModel.selectedTool == .erase) {
+                    viewModel.selectedTool = .erase
+                }
+                BuilderToolButton(icon: "number.circle", label: "Digit", isSelected: isDigitTool) {
+                    viewModel.selectedTool = .digit(1)
+                }
+                BuilderToolButton(icon: "thermometer", label: "Thermo", isSelected: viewModel.selectedTool == .thermo) {
+                    viewModel.selectedTool = .thermo
+                }
+                BuilderToolButton(icon: "arrow.up.right", label: "Arrow", isSelected: viewModel.selectedTool == .arrow) {
+                    viewModel.selectedTool = .arrow
+                }
+                BuilderToolButton(icon: "square.dashed", label: "Cage", isSelected: isCageTool) {
+                    viewModel.selectedTool = .cage(10)
+                }
+                BuilderToolButton(icon: "circle.square", label: "Odd/Even", isSelected: isOddEvenTool) {
+                    viewModel.selectedTool = .oddEven("1")
+                }
+                BuilderToolButton(icon: "circle", label: "W. Dot", isSelected: viewModel.selectedTool == .whiteDot) {
+                    viewModel.selectedTool = .whiteDot
+                }
+                BuilderToolButton(icon: "circle.fill", label: "B. Dot", isSelected: viewModel.selectedTool == .blackDot) {
+                    viewModel.selectedTool = .blackDot
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.vertical, 6)
+    }
+    
+    // MARK: - Contextual Palette
+    
+    private var contextualPalette: some View {
+        ZStack {
+            if isDigitTool { digitPicker }
+            else if isCageTool { cageSumPicker }
+            else if isOddEvenTool { oddEvenPicker }
+            else if viewModel.isShapeInProgress { shapeControls }
+        }
+        .frame(height: 44)
+    }
+    
+    private var shapeControls: some View {
+        HStack(spacing: 16) {
+            Button(action: { viewModel.cancelCurrentShape() }) {
+                Label("Cancel", systemImage: "xmark")
+                    .font(.subheadline)
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            
+            Button(action: { viewModel.finishCurrentShape() }) {
+                Label("Finish Shape", systemImage: "checkmark")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(viewModel.currentShapePath.count < 2)
+        }
+    }
+    
+    // MARK: - Bottom Controls
+    
+    private var bottomControls: some View {
+        HStack(spacing: 16) {
+            Button(action: { viewModel.checkValidation() }) {
                 if viewModel.isValidating {
-                    ProgressView()
-                        .frame(height: 20)
+                    ProgressView().frame(height: 20)
                 } else {
-                    Text("Check Human Solvable")
+                    Label("Validate", systemImage: "checkmark.shield")
                         .font(.subheadline)
                 }
             }
             .disabled(viewModel.isValidating)
             .buttonStyle(.bordered)
         }
-        .padding(.bottom, 10)
+        .padding(.horizontal)
+        .padding(.bottom, 8)
     }
     
-    private var toolPalette: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                BuilderToolButton(icon: "eraser", label: "Erase", isSelected: viewModel.selectedTool == .erase) {
-                    viewModel.selectedTool = .erase
-                }
-                
-                BuilderToolButton(icon: "number.circle", label: "Digit", isSelected: isDigitTool) {
-                    viewModel.selectedTool = .digit(1) // Default to 1
-                }
-                
-                BuilderToolButton(icon: "thermometer", label: "Thermo", isSelected: viewModel.selectedTool == .thermo) {
-                    viewModel.selectedTool = .thermo
-                }
-                
-                BuilderToolButton(icon: "arrow.up.right", label: "Arrow", isSelected: viewModel.selectedTool == .arrow) {
-                    viewModel.selectedTool = .arrow
-                }
-                
-                BuilderToolButton(icon: "square.dashed", label: "Cage", isSelected: isCageTool) {
-                    viewModel.selectedTool = .cage(10) // Default sum
-                }
-                
-                BuilderToolButton(icon: "circle.circle", label: "Odd/Even", isSelected: isOddEvenTool) {
-                    viewModel.selectedTool = .oddEven("1") // Default odd
-                }
-                
-                BuilderToolButton(icon: "circle", label: "White Dot", isSelected: viewModel.selectedTool == .whiteDot) {
-                    viewModel.selectedTool = .whiteDot
-                }
-                
-                BuilderToolButton(icon: "circle.fill", label: "Black Dot", isSelected: viewModel.selectedTool == .blackDot) {
-                    viewModel.selectedTool = .blackDot
-                }
-            }
-            .padding(.horizontal)
-        }
-        .padding(.vertical, 10)
-    }
+    // MARK: - Grid
     
     private var gridMatrix: some View {
         GeometryReader { geo in
             let availableWidth = max(0, min(geo.size.width, geo.size.height) - 32)
-            let cellSize = max(0, availableWidth / 9.0)
+            let cellSize = max(1, availableWidth / 9.0)
             
             ZStack {
-                // Lines and Cages Layer
-                if !viewModel.thermoPaths.isEmpty { ThermoOverlay(paths: viewModel.thermoPaths) }
-                // TODO: Add Arrow/Cage Drawing Overlay layers
-                
-                if viewModel.isDrawing {
-                    drawingOverlay(cellSize: cellSize)
+                if !viewModel.thermoPaths.isEmpty {
+                    ThermoOverlay(paths: viewModel.thermoPaths)
                 }
                 
                 cellsGrid(cellSize: cellSize)
                 
-                dragInteractionLayer(cellSize: cellSize)
+                // Kropki dots overlay
+                kropkiDotsOverlay(cellSize: cellSize)
+                
+                // In-progress shape path overlay
+                if viewModel.isShapeInProgress {
+                    shapePathOverlay(cellSize: cellSize)
+                }
             }
             .frame(width: availableWidth, height: availableWidth)
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
         }
     }
     
-    // MARK: - Grid Sub-Layers
-    
-    private func drawingOverlay(cellSize: CGFloat) -> some View {
-        Path { path in
-            for (index, cellId) in viewModel.currentDrawingPath.enumerated() {
-                let r = CGFloat(cellId / 9)
-                let c = CGFloat(cellId % 9)
-                let center = CGPoint(x: c * cellSize + cellSize/2, y: r * cellSize + cellSize/2)
-                if index == 0 {
-                    path.move(to: center)
-                } else {
-                    path.addLine(to: center)
-                }
-            }
-        }
-        .stroke(Color.blue.opacity(0.5), lineWidth: cellSize * 0.4)
-    }
-    
     private func cellsGrid(cellSize: CGFloat) -> some View {
         LazyVGrid(columns: columns, spacing: 0) {
             ForEach(viewModel.cells) { cell in
-                BuilderCellView(cell: cell, cellSize: cellSize, isSelected: false)
-                    .frame(width: cellSize, height: cellSize)
-                    .border(Color.gray.opacity(0.3), width: 0.5)
-                    // 3x3 Block Thicker Boundaries
-                    .overlay(blockBoundaryOverlay(for: cell))
+                builderCell(cell: cell, cellSize: cellSize)
+                    .onTapGesture {
+                        viewModel.handleCellTap(cell.id)
+                    }
             }
         }
         .border(Color.primary, width: 2)
@@ -206,10 +226,57 @@ struct LevelBuilderView: View {
     }
     
     @ViewBuilder
+    private func builderCell(cell: SudokuCellModel, cellSize: CGFloat) -> some View {
+        let isInPath = viewModel.currentShapePath.contains(cell.id)
+        let isKropkiSelected = viewModel.kropkiFirstCell == cell.id
+        
+        ZStack {
+            // Background
+            Rectangle()
+                .fill(
+                    isKropkiSelected ? Color.blue.opacity(0.25) :
+                    isInPath ? Color.green.opacity(0.15) :
+                    Color.clear
+                )
+            
+            // Parity indicator (Req 3: Odd=Circle, Even=Square)
+            if let p = cell.parity {
+                if p == "1" {
+                    Circle()
+                        .stroke(Color.oddEvenFrame, lineWidth: 2)
+                        .padding(cellSize * 0.125)
+                } else if p == "2" {
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.oddEvenFrame, lineWidth: 2)
+                        .padding(cellSize * 0.125)
+                }
+            }
+            
+            // Cell digit
+            if cell.value != 0 {
+                Text("\(cell.value)")
+                    .font(.system(size: cellSize * 0.55, weight: .bold))
+                    .foregroundColor(cell.isClue ? .primary : .blue)
+            }
+            
+            // Shape step number overlay
+            if let step = viewModel.stepNumber(for: cell.id) {
+                Text("\(step)")
+                    .font(.system(size: cellSize * 0.3, weight: .heavy, design: .rounded))
+                    .foregroundColor(.green)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(2)
+            }
+        }
+        .frame(width: cellSize, height: cellSize)
+        .border(Color.gray.opacity(0.3), width: 0.5)
+        .overlay(blockBoundaryOverlay(for: cell))
+    }
+    
+    @ViewBuilder
     private func blockBoundaryOverlay(for cell: SudokuCellModel) -> some View {
         let col = cell.id % 9
         let row = cell.id / 9
-        
         ZStack {
             if col % 3 == 2 && col != 8 {
                 Rectangle()
@@ -226,46 +293,75 @@ struct LevelBuilderView: View {
         }
     }
     
-    private func dragInteractionLayer(cellSize: CGFloat) -> some View {
-        Color.clear
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        let col = Int(value.location.x / cellSize)
-                        let row = Int(value.location.y / cellSize)
-                        if col >= 0 && col < 9 && row >= 0 && row < 9 {
-                            let cellId = row * 9 + col
-                            if viewModel.isDrawing {
-                                viewModel.updateDrawing(to: cellId)
-                            } else {
-                                viewModel.handleCellTap(cellId) // Tap fallback
-                                if viewModel.requiresDragToDraw {
-                                     viewModel.startDrawing(at: cellId)
-                                }
-                            }
-                        }
-                    }
-                    .onEnded { _ in
-                        viewModel.endDrawing()
-                    }
-            )
+    // MARK: - Overlays
+    
+    private func shapePathOverlay(cellSize: CGFloat) -> some View {
+        Path { path in
+            for (index, cellId) in viewModel.currentShapePath.enumerated() {
+                let r = CGFloat(cellId / 9)
+                let c = CGFloat(cellId % 9)
+                let center = CGPoint(x: c * cellSize + cellSize / 2, y: r * cellSize + cellSize / 2)
+                if index == 0 {
+                    path.move(to: center)
+                } else {
+                    path.addLine(to: center)
+                }
+            }
+        }
+        .stroke(Color.green.opacity(0.5), style: StrokeStyle(lineWidth: cellSize * 0.3, lineCap: .round, lineJoin: .round))
+        .allowsHitTesting(false)
     }
     
-    // UI Helpers
+    private func kropkiDotsOverlay(cellSize: CGFloat) -> some View {
+        ZStack {
+            ForEach(Array(viewModel.whiteDots.enumerated()), id: \.offset) { _, dot in
+                kropkiDotView(dot: dot, cellSize: cellSize, isFilled: false)
+            }
+            ForEach(Array(viewModel.blackDots.enumerated()), id: \.offset) { _, dot in
+                kropkiDotView(dot: dot, cellSize: cellSize, isFilled: true)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+    
+    @ViewBuilder
+    private func kropkiDotView(dot: SudokuLevel.KropkiDot, cellSize: CGFloat, isFilled: Bool) -> some View {
+        let x = CGFloat(dot.c1 + dot.c2) / 2.0 * cellSize + cellSize / 2
+        let y = CGFloat(dot.r1 + dot.r2) / 2.0 * cellSize + cellSize / 2
+        let dotSize = cellSize * 0.25
+        
+        Circle()
+            .fill(isFilled ? Color.primary : Color(uiColor: .systemBackground))
+            .frame(width: dotSize, height: dotSize)
+            .overlay(Circle().stroke(Color.primary, lineWidth: 1.5))
+            .position(x: x, y: y)
+    }
+    
+    // MARK: - UI Helpers
+    
     var isDigitTool: Bool {
         if case .digit = viewModel.selectedTool { return true }
         return false
     }
-    
     var isCageTool: Bool {
         if case .cage = viewModel.selectedTool { return true }
         return false
     }
-    
     var isOddEvenTool: Bool {
         if case .oddEven = viewModel.selectedTool { return true }
         return false
+    }
+    var currentDigit: Int {
+        if case .digit(let n) = viewModel.selectedTool { return n }
+        return 1
+    }
+    var currentCageSum: Int {
+        if case .cage(let s) = viewModel.selectedTool { return s }
+        return 10
+    }
+    var currentParity: String {
+        if case .oddEven(let p) = viewModel.selectedTool { return p }
+        return "1"
     }
     
     var digitPicker: some View {
@@ -283,7 +379,6 @@ struct LevelBuilderView: View {
     }
     
     var cageSumPicker: some View {
-        // Simple stepper for cage sum
         HStack {
             Text("Cage Sum: \(currentCageSum)")
             Stepper("", onIncrement: {
@@ -296,42 +391,29 @@ struct LevelBuilderView: View {
     }
     
     var oddEvenPicker: some View {
-        HStack {
-            Button("Odd (Blue)") {
-                viewModel.selectedTool = .oddEven("1")
+        HStack(spacing: 12) {
+            Button(action: { viewModel.selectedTool = .oddEven("1") }) {
+                Label("Odd", systemImage: "circle")
+                    .font(.subheadline).fontWeight(.medium)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 14).padding(.vertical, 6)
             .background(currentParity == "1" ? Color.blue : Color(uiColor: .systemGray5))
             .foregroundColor(currentParity == "1" ? .white : .primary)
             .cornerRadius(8)
             
-            Button("Even (Orange)") {
-                viewModel.selectedTool = .oddEven("2")
+            Button(action: { viewModel.selectedTool = .oddEven("2") }) {
+                Label("Even", systemImage: "square")
+                    .font(.subheadline).fontWeight(.medium)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 14).padding(.vertical, 6)
             .background(currentParity == "2" ? Color.orange : Color(uiColor: .systemGray5))
             .foregroundColor(currentParity == "2" ? .white : .primary)
             .cornerRadius(8)
         }
     }
-    
-    var currentDigit: Int {
-        if case .digit(let n) = viewModel.selectedTool { return n }
-        return 1
-    }
-    
-    var currentCageSum: Int {
-        if case .cage(let s) = viewModel.selectedTool { return s }
-        return 10
-    }
-    
-    var currentParity: String {
-        if case .oddEven(let p) = viewModel.selectedTool { return p }
-        return "1"
-    }
 }
+
+// MARK: - Supporting Views
 
 struct BuilderToolButton: View {
     let icon: String
@@ -341,38 +423,16 @@ struct BuilderToolButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack {
+            VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.title2)
+                    .font(.title3)
                 Text(label)
-                    .font(.caption2)
+                    .font(.system(size: 9, weight: .medium))
             }
-            .frame(width: 60, height: 60)
+            .frame(width: 52, height: 52)
             .background(isSelected ? Color.blue.opacity(0.2) : Color(uiColor: .systemGray6))
             .foregroundColor(isSelected ? .blue : .primary)
-            .cornerRadius(12)
+            .cornerRadius(10)
         }
     }
 }
-
-struct BuilderCellView: View {
-    let cell: SudokuCellModel
-    let cellSize: CGFloat
-    let isSelected: Bool
-    
-    var body: some View {
-        ZStack {
-            if cell.value != 0 {
-                Text("\(cell.value)")
-                    .font(.system(size: cellSize * 0.7, weight: .bold))
-            }
-            
-            // Parity Indicator
-            if let p = cell.parity {
-                let color = p == "1" ? Color.blue : Color.orange
-                Circle().stroke(color, lineWidth: 2).padding(2)
-            }
-        }
-    }
-}
-

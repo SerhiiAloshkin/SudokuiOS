@@ -4,60 +4,154 @@ import Combine
 
 @MainActor
 class LevelBuilderViewModel: ObservableObject {
-    @Published var selectedTool: BuilderTool = .digit(1)
-    
-    enum BoardBaseType: String, CaseIterable {
-        case classic = "Classic"
-        case nonConsecutive = "Non-Consecutive"
-        case king = "King Move"
-        case knight = "Knight Move"
+    @Published var selectedTool: BuilderTool = .digit(1) {
+        didSet {
+            // Commit any in-progress shape when switching tools
+            if isShapeInProgress { finishCurrentShape() }
+            // Clear Kropki selection when switching tools
+            kropkiFirstCell = nil
+        }
     }
-    @Published var boardBaseType: BoardBaseType = .classic
     
-    var cells: [SudokuCellModel] = []
+    // MARK: - Multi-Select Global Rules (Req 2)
+    @Published var isClassic: Bool = true
+    @Published var isNonConsecutive: Bool = false
+    @Published var isKing: Bool = false
+    @Published var isKnight: Bool = false
     
-    // Validation
+    func toggleRule(_ rule: GlobalRule) {
+        switch rule {
+        case .classic:
+            isClassic.toggle()
+            if isClassic { isNonConsecutive = false }
+        case .nonConsecutive:
+            isNonConsecutive.toggle()
+            if isNonConsecutive { isClassic = false }
+        case .king:
+            isKing.toggle()
+        case .knight:
+            isKnight.toggle()
+        }
+        // Ensure at least one base rule is active
+        if !isClassic && !isNonConsecutive {
+            isClassic = true
+        }
+    }
+    
+    enum GlobalRule: String, CaseIterable {
+        case classic = "Classic"
+        case nonConsecutive = "Non-Consec"
+        case king = "King"
+        case knight = "Knight"
+    }
+    
+    func isRuleActive(_ rule: GlobalRule) -> Bool {
+        switch rule {
+        case .classic: return isClassic
+        case .nonConsecutive: return isNonConsecutive
+        case .king: return isKing
+        case .knight: return isKnight
+        }
+    }
+    
+    // MARK: - Cells
+    @Published var cells: [SudokuCellModel] = []
+    
+    // MARK: - Validation
     @Published var isValidating: Bool = false
     @Published var validationResult: String? = nil
     
-    // Board Rules
+    // MARK: - Board Rules Data
     var arrows: [SudokuLevel.Arrow] = []
     var thermoPaths: [[[Int]]] = []
     var cages: [SudokuLevel.Cage] = []
     var whiteDots: [SudokuLevel.KropkiDot] = []
     var blackDots: [SudokuLevel.KropkiDot] = []
     
-    // UI Drawing State
-    @Published var isDrawing: Bool = false
-    @Published var currentDrawingPath: [Int] = [] // Cell Indices
+    // MARK: - Sequential Tap Drawing State (Req 1)
+    @Published var currentShapePath: [Int] = []
+    var isShapeInProgress: Bool { !currentShapePath.isEmpty }
+    @Published var showInvalidTapFeedback: Bool = false
+    
+    // MARK: - Kropki Placement State (Req 4)
+    @Published var kropkiFirstCell: Int? = nil
+    
+    // MARK: - Edit Mode
+    var editingLevelID: UUID? = nil
     
     enum BuilderTool: Equatable {
         case digit(Int)
         case erase
         case thermo
         case arrow
-        case cage(Int) // Sum required
+        case cage(Int)
         case whiteDot
         case blackDot
-        case oddEven(String) // "1" or "2"
+        case oddEven(String)
     }
+    
+    // MARK: - Init
     
     init() {
         setupEmptyBoard()
     }
     
+    init(existingLevel: CustomSudokuLevel) {
+        setupEmptyBoard()
+        hydrateFrom(existingLevel)
+    }
+    
     private func setupEmptyBoard() {
         cells = (0..<81).map { i in
-            let row = i / 9
-            let col = i % 9
-            return SudokuCellModel(id: i, row: row, col: col, value: 0, isClue: false)
+            SudokuCellModel(id: i, row: i / 9, col: i % 9, value: 0, isClue: false)
         }
     }
     
+    // MARK: - Edit Hydration
+    
+    private func hydrateFrom(_ level: CustomSudokuLevel) {
+        editingLevelID = level.id
+        
+        // Board digits
+        let boardChars = Array(level.board)
+        for i in 0..<min(81, boardChars.count) {
+            if let digit = Int(String(boardChars[i])), digit > 0 {
+                cells[i].value = digit
+                cells[i].isClue = true
+            }
+        }
+        
+        // Rule toggles
+        isNonConsecutive = level.isNonConsecutive
+        isClassic = !level.isNonConsecutive
+        isKing = level.isKing
+        isKnight = level.isKnight
+        
+        // Decode variant data
+        if let data = level.thermoPathsData {
+            thermoPaths = (try? JSONDecoder().decode([[[Int]]].self, from: data)) ?? []
+        }
+        if let data = level.arrowsData {
+            arrows = (try? JSONDecoder().decode([SudokuLevel.Arrow].self, from: data)) ?? []
+        }
+        if let data = level.cagesData {
+            cages = (try? JSONDecoder().decode([SudokuLevel.Cage].self, from: data)) ?? []
+        }
+        if let data = level.whiteDotsData {
+            whiteDots = (try? JSONDecoder().decode([SudokuLevel.KropkiDot].self, from: data)) ?? []
+        }
+        if let data = level.blackDotsData {
+            blackDots = (try? JSONDecoder().decode([SudokuLevel.KropkiDot].self, from: data)) ?? []
+        }
+    }
+    
+    // MARK: - Cell Tap Handling
+    
     func handleCellTap(_ cellId: Int) {
+        guard cellId >= 0, cellId < 81 else { return }
+        
         switch selectedTool {
         case .digit(let number):
-            // Check max digits placed = 9
             let placedCount = cells.filter { $0.value == number && $0.isClue }.count
             if placedCount < 9 {
                 cells[cellId].value = number
@@ -67,117 +161,134 @@ class LevelBuilderViewModel: ObservableObject {
             cells[cellId].value = 0
             cells[cellId].isClue = false
             cells[cellId].parity = nil
-            // In a fuller implementation, erasing a cell might also remove it from intersecting cages/thermos
         case .oddEven(let parity):
             cells[cellId].parity = parity
-        default:
-            break
+        case .thermo, .arrow, .cage:
+            handleShapeTap(cellId)
+        case .whiteDot, .blackDot:
+            handleKropkiTap(cellId)
         }
     }
     
-    // Drag gestures for Thermo/Arrow/Cage
-    func startDrawing(at cellId: Int) {
-        guard isDrawingTool(selectedTool) else { return }
-        isDrawing = true
-        currentDrawingPath = [cellId]
-    }
+    // MARK: - Sequential Tap Drawing (Req 1)
     
-    func updateDrawing(to cellId: Int) {
-        guard isDrawing, isDrawingTool(selectedTool) else { return }
-        guard let last = currentDrawingPath.last, last != cellId else { return }
-        
-        // Constraint: Check Max Length
-        if currentDrawingPath.count >= getMaxLength(for: selectedTool) {
+    private func handleShapeTap(_ cellId: Int) {
+        if currentShapePath.isEmpty {
+            // Start new shape
+            currentShapePath = [cellId]
             return
         }
         
-        // Ensure adjacent
-        let r1 = last / 9, c1 = last % 9
-        let r2 = cellId / 9, c2 = cellId % 9
+        guard let lastCell = currentShapePath.last else { return }
+        
+        // Check already in path
+        if currentShapePath.contains(cellId) {
+            triggerInvalidFeedback()
+            return
+        }
+        
+        // Check adjacency
+        guard isAdjacent(lastCell, cellId) else {
+            triggerInvalidFeedback()
+            return
+        }
+        
+        // Check max length
+        if currentShapePath.count >= getMaxLength(for: selectedTool) {
+            triggerInvalidFeedback()
+            return
+        }
+        
+        currentShapePath.append(cellId)
+    }
+    
+    func finishCurrentShape() {
+        guard currentShapePath.count > 1 else {
+            currentShapePath.removeAll()
+            return
+        }
+        
+        switch selectedTool {
+        case .thermo:
+            let pathCoords = currentShapePath.map { [$0 / 9, $0 % 9] }
+            thermoPaths.append(pathCoords)
+        case .arrow:
+            let bulb = [currentShapePath[0] / 9, currentShapePath[0] % 9]
+            let lineCoords = currentShapePath.dropFirst().map { [$0 / 9, $0 % 9] }
+            let arrow = SudokuLevel.Arrow(bulb: bulb, line: lineCoords)
+            arrows.append(arrow)
+        case .cage(let sum):
+            let cellsCoords = currentShapePath.map { [$0 / 9, $0 % 9] }
+            let cage = SudokuLevel.Cage(sum: sum, cells: cellsCoords)
+            cages.append(cage)
+        default:
+            break
+        }
+        
+        currentShapePath.removeAll()
+    }
+    
+    func cancelCurrentShape() {
+        currentShapePath.removeAll()
+    }
+    
+    // MARK: - Kropki Dot Placement (Req 4)
+    
+    private func handleKropkiTap(_ cellId: Int) {
+        guard selectedTool == .whiteDot || selectedTool == .blackDot else { return }
+        
+        if let firstCell = kropkiFirstCell {
+            if isAdjacent(firstCell, cellId) {
+                // Place dot between A and B
+                let r1 = firstCell / 9, c1 = firstCell % 9
+                let r2 = cellId / 9, c2 = cellId % 9
+                let dot = SudokuLevel.KropkiDot(r1: r1, c1: c1, r2: r2, c2: c2)
+                
+                if selectedTool == .whiteDot {
+                    whiteDots.append(dot)
+                } else {
+                    blackDots.append(dot)
+                }
+                kropkiFirstCell = nil
+            } else {
+                // Not adjacent — reassign
+                kropkiFirstCell = cellId
+            }
+        } else {
+            // First tap
+            kropkiFirstCell = cellId
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    private func isAdjacent(_ a: Int, _ b: Int) -> Bool {
+        let r1 = a / 9, c1 = a % 9
+        let r2 = b / 9, c2 = b % 9
         let dR = abs(r1 - r2)
         let dC = abs(c1 - c2)
-        
-        let isAdjacent = (dR <= 1 && dC <= 1) && !(dR == 0 && dC == 0)
-        
-        if isAdjacent {
-            if !currentDrawingPath.contains(cellId) {
-                currentDrawingPath.append(cellId)
-            }
-        }
+        return (dR <= 1 && dC <= 1) && !(dR == 0 && dC == 0)
     }
     
     private func getMaxLength(for tool: BuilderTool) -> Int {
         switch tool {
         case .thermo:
-            return boardBaseType == .nonConsecutive ? 5 : 9
-        case .whiteDot, .blackDot:
-            return 2
+            return isNonConsecutive ? 5 : 9
         default:
-            return 81 // Cages and arrows can theoretically span broadly
+            return 81
         }
     }
     
-    func endDrawing() {
-        guard isDrawing else { return }
-        isDrawing = false
-        
-        switch selectedTool {
-        case .thermo:
-            if currentDrawingPath.count > 1 {
-                let pathCoords = currentDrawingPath.map { [$0 / 9, $0 % 9] }
-                thermoPaths.append(pathCoords)
-            }
-        case .arrow:
-            if currentDrawingPath.count > 1 {
-                let bulb = [currentDrawingPath[0] / 9, currentDrawingPath[0] % 9]
-                let lineCoords = currentDrawingPath.dropFirst().map { [$0 / 9, $0 % 9] }
-                let arrow = SudokuLevel.Arrow(bulb: bulb, line: lineCoords)
-                arrows.append(arrow)
-            }
-        case .cage(let sum):
-            if currentDrawingPath.count > 0 {
-                // Rule: Cages cannot overlap themselves
-                let cellsCoords = currentDrawingPath.map { [$0 / 9, $0 % 9] }
-                let uniqueCoords = Set(cellsCoords.map { "\($0[0]),\($0[1])" })
-                if uniqueCoords.count != cellsCoords.count {
-                    print("Error: Cage contains overlapping cells.")
-                    currentDrawingPath.removeAll()
-                    return
-                }
-                
-                let cage = SudokuLevel.Cage(sum: sum, cells: cellsCoords)
-                cages.append(cage)
-            }
-        case .whiteDot, .blackDot:
-             if currentDrawingPath.count == 2 {
-                 let r1 = currentDrawingPath[0] / 9
-                 let c1 = currentDrawingPath[0] % 9
-                 let r2 = currentDrawingPath[1] / 9
-                 let c2 = currentDrawingPath[1] % 9
-                 
-                 let dot = SudokuLevel.KropkiDot(r1: r1, c1: c1, r2: r2, c2: c2)
-                 if selectedTool == .whiteDot {
-                     whiteDots.append(dot)
-                 } else {
-                     blackDots.append(dot)
-                 }
-             }
-        default:
-            break
-        }
-        
-        currentDrawingPath.removeAll()
-    }
-    
-    private func isDrawingTool(_ tool: BuilderTool) -> Bool {
-        switch tool {
-        case .thermo, .arrow, .cage, .whiteDot, .blackDot: return true
-        default: return false
+    private func triggerInvalidFeedback() {
+        showInvalidTapFeedback = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.showInvalidTapFeedback = false
         }
     }
     
-    var requiresDragToDraw: Bool {
-        return isDrawingTool(selectedTool)
+    func stepNumber(for cellId: Int) -> Int? {
+        guard let idx = currentShapePath.firstIndex(of: cellId) else { return nil }
+        return idx + 1
     }
     
     // MARK: - Saving & Validation
@@ -186,18 +297,22 @@ class LevelBuilderViewModel: ObservableObject {
         let boardString = cells.map { "\($0.value)" }.joined()
         
         let rule: SudokuRuleType
-        switch boardBaseType {
-        case .classic: rule = .classic
-        case .nonConsecutive: rule = .classic // Represented via isNonConsecutive below
-        case .king: rule = .king
-        case .knight: rule = .knight
+        if isKing {
+            rule = .king
+        } else if isKnight {
+            rule = .knight
+        } else {
+            rule = .classic
         }
         
         return CustomSudokuLevel(
+            id: editingLevelID ?? UUID(),
             board: boardString,
             difficulty: "Custom",
             ruleType: rule,
-            isNonConsecutive: boardBaseType == .nonConsecutive,
+            isNonConsecutive: isNonConsecutive,
+            isKing: isKing,
+            isKnight: isKnight,
             thermoPathsData: try? JSONEncoder().encode(thermoPaths),
             arrowsData: try? JSONEncoder().encode(arrows),
             cagesData: try? JSONEncoder().encode(cages),
@@ -207,7 +322,21 @@ class LevelBuilderViewModel: ObservableObject {
     }
     
     func saveLevel(context: ModelContext) {
+        // Commit any in-progress shape before saving
+        if isShapeInProgress { finishCurrentShape() }
+        
         let customLevel = buildCustomLevel()
+        
+        // If editing, delete old version first
+        if let existingID = editingLevelID {
+            let descriptor = FetchDescriptor<CustomSudokuLevel>(
+                predicate: #Predicate { $0.id == existingID }
+            )
+            if let existing = try? context.fetch(descriptor).first {
+                context.delete(existing)
+            }
+        }
+        
         context.insert(customLevel)
         do {
             try context.save()
@@ -223,7 +352,6 @@ class LevelBuilderViewModel: ObservableObject {
         
         let customLevel = buildCustomLevel()
         
-        // Background logical solve on MainActor
         Task {
             let solver = HumanLogicSolver(level: customLevel)
             let (_, unsolvedCount, stalled) = solver.solve()

@@ -14,7 +14,34 @@ struct MainMenuView: View {
     enum SudokuRoute: Hashable {
         case levelSelection
         case levelBuilder
+        case levelBuilderEdit(CustomSudokuLevel)
+        case customLevels
+        case customGame(UUID)
         case game(Int)
+        
+        // Hashable conformance for CustomSudokuLevel
+        static func == (lhs: SudokuRoute, rhs: SudokuRoute) -> Bool {
+            switch (lhs, rhs) {
+            case (.levelSelection, .levelSelection): return true
+            case (.levelBuilder, .levelBuilder): return true
+            case (.levelBuilderEdit(let a), .levelBuilderEdit(let b)): return a.id == b.id
+            case (.customLevels, .customLevels): return true
+            case (.customGame(let a), .customGame(let b)): return a == b
+            case (.game(let a), .game(let b)): return a == b
+            default: return false
+            }
+        }
+        
+        func hash(into hasher: inout Hasher) {
+            switch self {
+            case .levelSelection: hasher.combine("levelSelection")
+            case .levelBuilder: hasher.combine("levelBuilder")
+            case .levelBuilderEdit(let level): hasher.combine("levelBuilderEdit"); hasher.combine(level.id)
+            case .customLevels: hasher.combine("customLevels")
+            case .customGame(let id): hasher.combine("customGame"); hasher.combine(id)
+            case .game(let id): hasher.combine("game"); hasher.combine(id)
+            }
+        }
     }
     
     var body: some View {
@@ -144,6 +171,18 @@ struct MainMenuView: View {
                                 .buttonStyle(PrimaryButtonStyle())
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                                 
+                                // 2.6 My Levels
+                                Button(action: {
+                                    navigationPath.append(.customLevels)
+                                }) {
+                                    HStack {
+                                        Image(systemName: "tray.full.fill")
+                                        Text("My Levels")
+                                    }
+                                }
+                                .buttonStyle(SecondaryButtonStyle())
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                                
                                 // 3. Settings (Secondary Action)
                                 Button(action: {
                                     showSettings = true
@@ -171,6 +210,13 @@ struct MainMenuView: View {
                     LevelSelectionView(navigationStack: $navigationPath)
                 case .levelBuilder:
                     LevelBuilderView(navigationStack: $navigationPath)
+                case .levelBuilderEdit(let level):
+                    LevelBuilderView(navigationStack: $navigationPath, existingLevel: level)
+                case .customLevels:
+                    CustomLevelsListView(navigationStack: $navigationPath)
+                case .customGame:
+                    // TODO: Implement custom level game loading
+                    Text("Custom Game - Coming Soon")
                 case .game(let id):
                      SudokuGameView(levelID: id, viewModel: viewModel, adCoordinator: adCoordinator, onNextLevel: { targetID in
                          print("MainMenuView: traversing to next level \(targetID) from \(id)")
