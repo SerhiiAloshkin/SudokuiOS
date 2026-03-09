@@ -5,7 +5,15 @@ import Combine
 @MainActor
 class LevelBuilderViewModel: ObservableObject {
     @Published var selectedTool: BuilderTool = .digit(1)
-    @Published var isNonConsecutive: Bool = false
+    
+    enum BoardBaseType: String, CaseIterable {
+        case classic = "Classic"
+        case nonConsecutive = "Non-Consecutive"
+        case king = "King Move"
+        case knight = "Knight Move"
+    }
+    @Published var boardBaseType: BoardBaseType = .classic
+    
     var cells: [SudokuCellModel] = []
     
     // Validation
@@ -47,8 +55,6 @@ class LevelBuilderViewModel: ObservableObject {
     }
     
     func handleCellTap(_ cellId: Int) {
-        // ... (We will rely on HumanLogicSolver for heavy validation)
-        
         switch selectedTool {
         case .digit(let number):
             // Check max digits placed = 9
@@ -60,7 +66,8 @@ class LevelBuilderViewModel: ObservableObject {
         case .erase:
             cells[cellId].value = 0
             cells[cellId].isClue = false
-            // TODO: Also remove cells from cages/thermos if erasing hits them
+            cells[cellId].parity = nil
+            // In a fuller implementation, erasing a cell might also remove it from intersecting cages/thermos
         case .oddEven(let parity):
             cells[cellId].parity = parity
         default:
@@ -79,16 +86,34 @@ class LevelBuilderViewModel: ObservableObject {
         guard isDrawing, isDrawingTool(selectedTool) else { return }
         guard let last = currentDrawingPath.last, last != cellId else { return }
         
+        // Constraint: Check Max Length
+        if currentDrawingPath.count >= getMaxLength(for: selectedTool) {
+            return
+        }
+        
         // Ensure adjacent
         let r1 = last / 9, c1 = last % 9
         let r2 = cellId / 9, c2 = cellId % 9
         let dR = abs(r1 - r2)
         let dC = abs(c1 - c2)
         
-        if (dR == 1 && dC == 0) || (dR == 0 && dC == 1) || (dR == 1 && dC == 1) { // Allowing diagonal for cages? Usually Orthogonal for thermo/arrow
+        let isAdjacent = (dR <= 1 && dC <= 1) && !(dR == 0 && dC == 0)
+        
+        if isAdjacent {
             if !currentDrawingPath.contains(cellId) {
                 currentDrawingPath.append(cellId)
             }
+        }
+    }
+    
+    private func getMaxLength(for tool: BuilderTool) -> Int {
+        switch tool {
+        case .thermo:
+            return boardBaseType == .nonConsecutive ? 5 : 9
+        case .whiteDot, .blackDot:
+            return 2
+        default:
+            return 81 // Cages and arrows can theoretically span broadly
         }
     }
     
@@ -157,44 +182,58 @@ class LevelBuilderViewModel: ObservableObject {
     
     // MARK: - Saving & Validation
     
-    func validateAndSave(context: ModelContext) {
-        isValidating = true
-        validationResult = nil
-        
+    private func buildCustomLevel() -> CustomSudokuLevel {
         let boardString = cells.map { "\($0.value)" }.joined()
         
-        let customLevel = CustomSudokuLevel(
+        let rule: SudokuRuleType
+        switch boardBaseType {
+        case .classic: rule = .classic
+        case .nonConsecutive: rule = .classic // Represented via isNonConsecutive below
+        case .king: rule = .king
+        case .knight: rule = .knight
+        }
+        
+        return CustomSudokuLevel(
             board: boardString,
             difficulty: "Custom",
-            ruleType: .classic, // Default for now, could be dynamic
-            isNonConsecutive: isNonConsecutive,
+            ruleType: rule,
+            isNonConsecutive: boardBaseType == .nonConsecutive,
             thermoPathsData: try? JSONEncoder().encode(thermoPaths),
             arrowsData: try? JSONEncoder().encode(arrows),
             cagesData: try? JSONEncoder().encode(cages),
             whiteDotsData: try? JSONEncoder().encode(whiteDots),
             blackDotsData: try? JSONEncoder().encode(blackDots)
         )
+    }
+    
+    func saveLevel(context: ModelContext) {
+        let customLevel = buildCustomLevel()
+        context.insert(customLevel)
+        do {
+            try context.save()
+            self.validationResult = "Saved successfully!"
+        } catch {
+            self.validationResult = "Failed to save: \(error.localizedDescription)"
+        }
+    }
+    
+    func checkValidation() {
+        isValidating = true
+        validationResult = nil
         
-        // Background logical solve on MainActor since it's fast and touches SwiftData heavily
+        let customLevel = buildCustomLevel()
+        
+        // Background logical solve on MainActor
         Task {
             let solver = HumanLogicSolver(level: customLevel)
-            let (solutionBoard, unsolvedCount, stalled) = solver.solve()
+            let (_, unsolvedCount, stalled) = solver.solve()
             
             self.isValidating = false
             
             if unsolvedCount == 0 && !stalled {
-                // Success!
-                customLevel.solution = solutionBoard
-                context.insert(customLevel)
-                do {
-                    try context.save()
-                    self.validationResult = "Saved successfully!"
-                    print("Successfully saved Custom Level!")
-                } catch {
-                    self.validationResult = "Failed to save: \(error.localizedDescription)"
-                }
+                self.validationResult = "Level has a unique Human-Solvable solution!"
             } else {
-                self.validationResult = "Level is not Human-Solvable (Unsolved: \(unsolvedCount))"
+                self.validationResult = "Level is not cleanly Human-Solvable (Unsolved cells: \(unsolvedCount))"
             }
         }
     }
