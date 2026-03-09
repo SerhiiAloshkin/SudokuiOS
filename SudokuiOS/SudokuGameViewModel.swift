@@ -36,6 +36,9 @@ class SudokuGameViewModel: ObservableObject {
     private var parentViewModel: LevelViewModel
     var levelViewModel: LevelViewModel { parentViewModel } // Expose for View access
     
+    /// Custom levels use unique negative IDs (from UUID hash)
+    var isCustomLevel: Bool { levelID < 0 }
+    
     // Game State
     @Published var currentBoard: String = ""
     private(set) var currentBoardArray: [Int] = Array(repeating: 0, count: 81)
@@ -947,23 +950,26 @@ class SudokuGameViewModel: ObservableObject {
                 addMove(cellIndex: index, moveType: "Value", oldValue: oldValue, newValue: newValue, batchID: batchID, performSave: false)
                 
                 // --- Mistake Check Logic ---
-                let isLimitEnabled = settings?.isMistakeLimitEnabled ?? true
-                if targetValue != 0 && isLimitEnabled {
-                    let isIncorrect = targetValue != solutionArray[index]
-                    if isIncorrect {
-                        // It's a mistake!
-                        mistakesCount += 1
-                        
-                        // Check Game Over
-                        if mistakesCount >= 3 {
-                            DispatchQueue.main.async {
-                                self.isGameOver = true
-                                self.stopTimer()
+                // Skip solution-based mistakes for custom levels (no solution data)
+                if !isCustomLevel {
+                    let isLimitEnabled = settings?.isMistakeLimitEnabled ?? true
+                    if targetValue != 0 && isLimitEnabled {
+                        let isIncorrect = targetValue != solutionArray[index]
+                        if isIncorrect {
+                            // It's a mistake!
+                            mistakesCount += 1
+                            
+                            // Check Game Over
+                            if mistakesCount >= 3 {
+                                DispatchQueue.main.async {
+                                    self.isGameOver = true
+                                    self.stopTimer()
+                                }
                             }
+                            
+                            // We do NOT stop entering the value, it still gets placed
+                            // The UI will highlight it as red depending on the mistakeMode setting.
                         }
-                        
-                        // We do NOT stop entering the value, it still gets placed
-                        // The UI will highlight it as red depending on the mistakeMode setting.
                     }
                 }
                 // ---------------------------
@@ -1267,6 +1273,7 @@ class SudokuGameViewModel: ObservableObject {
     }
     
     private func checkForRevealedMistakes() {
+        guard !isCustomLevel else { return } // No solution to compare
         guard let origin = waveOrigin else { return }
         let originRow = origin / 9
         let originCol = origin % 9
@@ -1490,13 +1497,13 @@ class SudokuGameViewModel: ObservableObject {
         if cell.value == 0 { return false }
         if isClue(at: index) { return false }
         
-        // 1. Solution Check (O(1) array access)
+        // 1. Solution Check (skip for custom levels — no solution data)
         var isSolutionMismatch = false
-        if index < solutionArray.count {
+        if !isCustomLevel, index < solutionArray.count {
             isSolutionMismatch = cell.value != solutionArray[index]
         }
         
-        // 2. Non-Consecutive Rule Check
+        // 2. Non-Consecutive Rule Check (keep for all levels)
         var isVariantViolation = false
         if isNonConsecutive || rules.contains(.nonConsecutive) {
             isVariantViolation = hasConsecutiveNeighbor(at: index, value: cell.value)

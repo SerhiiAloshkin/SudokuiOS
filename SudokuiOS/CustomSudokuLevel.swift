@@ -143,20 +143,23 @@ final class CustomSudokuLevel: Identifiable {
             return String(data: data, encoding: .utf8)
         }()
         
-        // Add variant-specific primary rules based on data presence
-        if thermos != nil && !thermos!.isEmpty && !typesArray.contains(.thermo) {
+        // Add variant-specific primary rules ONLY when data actually exists
+        if let t = thermos, !t.isEmpty, !typesArray.contains(.thermo) {
             typesArray.append(.thermo)
         }
-        if arrowsList != nil && !arrowsList!.isEmpty && !typesArray.contains(.arrow) {
+        if let a = arrowsList, !a.isEmpty, !typesArray.contains(.arrow) {
             typesArray.append(.arrow)
         }
-        if cagesList != nil && !cagesList!.isEmpty && !typesArray.contains(.killer) {
+        if let c = cagesList, !c.isEmpty, !typesArray.contains(.killer) {
             typesArray.append(.killer)
         }
-        if (whiteDotsList != nil || blackDotsList != nil) && !typesArray.contains(.kropki) {
+        // Only add Kropki if dots actually exist and are non-empty
+        let hasWhiteDots = whiteDotsList != nil && !whiteDotsList!.isEmpty
+        let hasBlackDots = blackDotsList != nil && !blackDotsList!.isEmpty
+        if (hasWhiteDots || hasBlackDots) && !typesArray.contains(.kropki) {
             typesArray.append(.kropki)
         }
-        if parityString != nil && !typesArray.contains(.oddEven) {
+        if let p = parityString, p.contains(where: { $0 != "0" }), !typesArray.contains(.oddEven) {
             typesArray.append(.oddEven)
         }
         

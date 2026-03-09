@@ -59,7 +59,7 @@ struct CustomLevelsListView: View {
                 
                 HStack(spacing: 6) {
                     // Rule badges
-                    Text(level.ruleType.displayName)
+                    Text(level.ruleType.shortName)
                         .font(.caption2)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)

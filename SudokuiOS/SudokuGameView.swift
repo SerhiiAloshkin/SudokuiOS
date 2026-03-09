@@ -73,7 +73,7 @@ struct SudokuGameView: View {
                 SudokuKillerOverlayView(gameViewModel: gameViewModel)
                 
                 // Game Over Overlay
-                if gameViewModel.isGameOver {
+                if gameViewModel.isGameOver && !gameViewModel.isCustomLevel {
                     GameOverOverlayView(
                         onRestart: {
                             gameViewModel.restartLevel()
@@ -679,7 +679,7 @@ struct SudokuGameView: View {
             ZStack(alignment: .top) {
                 // Left-aligned Hint Button
                 HStack {
-                    if settings.showHintButton {
+                    if settings.showHintButton && !gameViewModel.isCustomLevel {
                         HintButtonView(
                             gameViewModel: gameViewModel,
                             storeManager: storeManager,
