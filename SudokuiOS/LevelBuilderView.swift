@@ -107,8 +107,8 @@ struct LevelBuilderView: View {
     // MARK: - Tool Palette
     
     private var toolPalette: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+        ScrollView(.horizontal, showsIndicators: true) {
+            HStack(spacing: 12) {
                 BuilderToolButton(icon: "eraser", label: "Erase", isSelected: viewModel.selectedTool == .erase) {
                     viewModel.selectedTool = .erase
                 }
@@ -133,9 +133,22 @@ struct LevelBuilderView: View {
                 BuilderToolButton(icon: "circle.fill", label: "B. Dot", isSelected: viewModel.selectedTool == .blackDot) {
                     viewModel.selectedTool = .blackDot
                 }
+                // Placeholder to ensure the last item can be fully seen even with the mask
+                Spacer().frame(width: 20)
             }
             .padding(.horizontal)
         }
+        .mask(
+            LinearGradient(
+                gradient: Gradient(stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: 0.85),
+                    .init(color: .clear, location: 1)
+                ]),
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
         .padding(.vertical, 6)
     }
     

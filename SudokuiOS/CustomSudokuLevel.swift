@@ -163,6 +163,27 @@ final class CustomSudokuLevel: Identifiable {
             typesArray.append(.oddEven)
         }
         
+        // Dynamic Sandwich Inference
+        let hasRowClues = rowClues != nil && !rowClues!.isEmpty && rowClues!.contains(where: { $0 > 0 })
+        let hasColClues = colClues != nil && !colClues!.isEmpty && colClues!.contains(where: { $0 > 0 })
+        if (hasRowClues || hasColClues) && !typesArray.contains(.sandwich) {
+            typesArray.append(.sandwich)
+        }
+        
+        // Ensure global rules are present if toggled
+        if isNonConsecutive && !typesArray.contains(.nonConsecutive) {
+            typesArray.append(.nonConsecutive)
+        }
+        if isKing && !typesArray.contains(.king) {
+            typesArray.append(.king)
+        }
+        if isKnight && !typesArray.contains(.knight) {
+            typesArray.append(.knight)
+        }
+        
+        // De-duplicate types array
+        typesArray = Array(Set(typesArray)).sorted(by: { $0.rawValue < $1.rawValue }) // Set for uniqueness, sort for stability
+        
         // Use unique negative ID from UUID hash to avoid collisions
         let uniqueID = -abs(id.hashValue % 1_000) - 1
         

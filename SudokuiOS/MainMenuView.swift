@@ -169,6 +169,7 @@ struct MainMenuView: View {
                                     .transition(.move(edge: .bottom).combined(with: .opacity))
                                 }
                                 
+                            }
                                 // 2. Select Level (Primary Action)
                                 Button(action: {
                                     navigationPath.append(.levelSelection)
