@@ -47,6 +47,7 @@ class SudokuGameViewModel: ObservableObject {
     @Published var isGameComplete: Bool = false 
     @Published var customLevelUUID: String? = nil
     @Published var customLevelTitle: String? = nil
+    @Published var showCustomBoardError: Bool = false
     
     // Multi-Select
     @Published var isMultiSelectMode: Bool = false
@@ -1479,8 +1480,26 @@ class SudokuGameViewModel: ObservableObject {
         }
         
         let isPerfect = (mistakesCount == 0 && hintsUsed == 0)
-        let customUUID = parentViewModel.levels.first(where: { $0.id == levelID })?.customUUID
+        let customUUID = self.customLevelUUID ?? parentViewModel.levels.first(where: { $0.id == levelID })?.customUUID
         parentViewModel.levelSolved(id: levelID, customUUID: customUUID, timeElapsed: timeElapsed, isPerfect: isPerfect, mistakesMade: mistakesCount)
+        
+        // 3b. Clear Custom Level Progress if applicable
+        if isCustomLevel, let uuidString = customUUID, let uuid = UUID(uuidString: uuidString) {
+             let context = parentViewModel.modelContext
+             let descriptor = FetchDescriptor<CustomSudokuLevel>(predicate: #Predicate<CustomSudokuLevel> { level in
+                 level.id == uuid
+             })
+             if let customLevel = try? context?.fetch(descriptor).first {
+                 customLevel.savedBoardProgress = nil
+                 customLevel.savedNotesData = nil
+                 customLevel.savedColorData = nil
+                 customLevel.savedMarkedCombinationsData = nil
+                 customLevel.savedKillerMarkedCombinationsData = nil
+                 customLevel.savedCrossData = nil
+                 customLevel.savedTime = 0
+                 try? context?.save()
+             }
+        }
         
         // Clear Active Game Session
         UserDefaults.standard.removeObject(forKey: "activeGameSession")
@@ -1503,29 +1522,43 @@ class SudokuGameViewModel: ObservableObject {
         // 1. Check if board is FULL
         let isFull = cells.allSatisfy { $0.value != 0 }
         
-        // 2. Victory Check (Always performed if full)
+        // 2. Victory Check
         if isFull {
-            let currentString = cells.map { String($0.value) }.joined()
-            let isCorrect = currentString == solution
-            
-            if isCorrect {
-                // VICTORY: Always trigger wave for celebration
-                if let lastIndex = selectedCellIndex {
-                     triggerVictoryWave(from: lastIndex)
+            if isCustomLevel {
+                // Custom Level: No solution array, must validate mathematically
+                let validator = SudokuValidator()
+                let boardMatrix = (0..<9).map { r in
+                    (0..<9).map { c in cells[r * 9 + c].value }
+                }
+                
+                if validator.validate(board: boardMatrix, rules: activeRules) {
+                    // Valid Solution found!
+                    if let lastIndex = selectedCellIndex {
+                        triggerVictoryWave(from: lastIndex)
+                    } else {
+                        triggerVictoryWave(from: 40)
+                    }
                 } else {
-                     triggerVictoryWave(from: 40)
+                    // Board is full but invalid
+                    showCustomBoardError = true
                 }
             } else {
-                // MISTAKES PRESENT:
-                // Only trigger wave to reveal mistakes IF:
-                // A) Board transitioned from Not Full -> Full (Users wants to see result of their last move)
-                // B) It wasn't full before (Same as A)
+                // Standard Level: Check against pre-calculated solution
+                let currentString = cells.map { String($0.value) }.joined()
+                let isCorrect = currentString == solution
                 
-                if !wasBoardFull {
+                if isCorrect {
                     if let lastIndex = selectedCellIndex {
-                         triggerVictoryWave(from: lastIndex)
+                        triggerVictoryWave(from: lastIndex)
                     } else {
-                         triggerVictoryWave(from: 40)
+                        triggerVictoryWave(from: 40)
+                    }
+                } else if !wasBoardFull {
+                    // revealed mistakes only on first transition to full
+                    if let lastIndex = selectedCellIndex {
+                        triggerVictoryWave(from: lastIndex)
+                    } else {
+                        triggerVictoryWave(from: 40)
                     }
                 }
             }
@@ -2306,13 +2339,62 @@ class SudokuGameViewModel: ObservableObject {
         let seconds = timeElapsed % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
-    
-    // MARK: - Header Info
     var levelTitle: String {
         if isCustomLevel {
             return customLevelTitle ?? "Custom Level"
         }
         return "Level \(levelID)"
+    }
+    
+    // Bridge rules for SudokuValidator
+    var activeRules: [SudokuRule] {
+        var results: [SudokuRule] = [.classic]
+        
+        let rowCluesOptional = rowClues?.map { $0 as Int? } ?? Array(repeating: nil, count: 9)
+        let colCluesOptional = colClues?.map { $0 as Int? } ?? Array(repeating: nil, count: 9)
+        
+        for rule in rules {
+            switch rule {
+            case .sandwich:
+                results.append(.sandwich(rows: rowCluesOptional, cols: colCluesOptional))
+            case .arrow:
+                results.append(.arrow(arrows ?? []))
+            case .thermo:
+                results.append(.thermo(paths: thermoPaths ?? []))
+            case .killer:
+                results.append(.killer(cages ?? []))
+            case .kropki:
+                results.append(.kropki(white: whiteDots ?? [], black: blackDots ?? [], negativeConstraint: negativeConstraint))
+            case .oddEven:
+                results.append(.oddEven(parity: parityOverlay ?? ""))
+            case .knight:
+                results.append(.knight)
+            case .king:
+                results.append(.king)
+            case .nonConsecutive:
+                results.append(.nonConsecutive)
+            case .classic:
+                break
+            }
+        }
+        
+        // Handle single rule fallback
+        if rules.isEmpty, let singleRule = ruleType {
+            switch singleRule {
+            case .sandwich: results.append(.sandwich(rows: rowCluesOptional, cols: colCluesOptional))
+            case .arrow: results.append(.arrow(arrows ?? []))
+            case .thermo: results.append(.thermo(paths: thermoPaths ?? []))
+            case .killer: results.append(.killer(cages ?? []))
+            case .kropki: results.append(.kropki(white: whiteDots ?? [], black: blackDots ?? [], negativeConstraint: negativeConstraint))
+            case .oddEven: results.append(.oddEven(parity: parityOverlay ?? ""))
+            case .knight: results.append(.knight)
+            case .king: results.append(.king)
+            case .nonConsecutive: results.append(.nonConsecutive)
+            case .classic: break
+            }
+        }
+        
+        return results
     }
     
     func getRawRuleType() -> String {

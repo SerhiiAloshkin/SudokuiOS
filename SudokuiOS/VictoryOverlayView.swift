@@ -8,6 +8,7 @@ struct VictoryOverlayView: View {
     let nextLevelID: Int
     let nextLevelVariant: SudokuRuleType
     let mistakesMade: Int
+    let isCustomLevel: Bool
     @ObservedObject var adCoordinator: AdCoordinator // Injected Dependency
     let onNextLevel: () -> Void
     let onDismiss: () -> Void
@@ -99,35 +100,37 @@ struct VictoryOverlayView: View {
                 .cornerRadius(16)
                 
                 // 4. Next Level Preview
-                VStack(spacing: 12) {
-                    HStack(spacing: 15) {
-                        // Variant Icon
-                        ZStack {
-                            Circle()
-                                .fill(Color.green.opacity(0.2))
-                                .frame(width: 50, height: 50)
+                if !isCustomLevel {
+                    VStack(spacing: 12) {
+                        HStack(spacing: 15) {
+                            // Variant Icon
+                            ZStack {
+                                Circle()
+                                    .fill(Color.green.opacity(0.2))
+                                    .frame(width: 50, height: 50)
+                                
+                                variantIcon
+                                    .foregroundColor(.green)
+                            }
                             
-                            variantIcon
-                                .foregroundColor(.green)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Next Challenge")
-                                .font(.subheadline)
-                                .foregroundColor(.primary)
-                            Text("Level \(nextLevelID)")
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
-                            Text(nextLevelVariant.displayName)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Next Challenge")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                                Text("Level \(nextLevelID)")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.primary)
+                                Text(nextLevelVariant.displayName)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
+                    .padding()
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .cornerRadius(16)
                 }
-                .padding()
-                .background(Color(uiColor: .secondarySystemBackground))
-                .cornerRadius(16)
                 
                 // 5. Buttons
                 VStack(spacing: 12) {
@@ -137,11 +140,20 @@ struct VictoryOverlayView: View {
                         
                         // Trigger Ad, then Navigate
                         adCoordinator.showInterstitialAd {
-                            onNextLevel()
+                            if isCustomLevel {
+                                onDismiss()
+                            } else {
+                                onNextLevel()
+                            }
                         }
                     }) {
                         HStack {
-                            if nextLevelID > currentLevelID {
+                            if isCustomLevel {
+                                Text("Done")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                Image(systemName: "checkmark.circle.fill")
+                            } else if nextLevelID > currentLevelID {
                                 Text("Next Level")
                                     .font(.headline)
                                     .fontWeight(.bold)
@@ -269,6 +281,7 @@ struct VictoryOverlayView: View {
         nextLevelID: 15,
         nextLevelVariant: .oddEven,
         mistakesMade: 0,
+        isCustomLevel: false,
         adCoordinator: AdCoordinator(), // Mock
         onNextLevel: {},
         onDismiss: {}

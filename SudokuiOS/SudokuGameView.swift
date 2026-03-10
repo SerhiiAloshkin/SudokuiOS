@@ -103,6 +103,7 @@ struct SudokuGameView: View {
                         nextLevelID: nextID,
                         nextLevelVariant: nextVariant,
                         mistakesMade: gameViewModel.mistakesCount,
+                        isCustomLevel: gameViewModel.isCustomLevel,
                         adCoordinator: adCoordinator, // Pass Coordinator
                         onNextLevel: {
                             // Navigation Only (Ad handled by Overlay)
@@ -146,6 +147,11 @@ struct SudokuGameView: View {
         }
         .alert(gameViewModel.hintErrorMessage, isPresented: $gameViewModel.showHintErrorAlert) {
             Button("OK", role: .cancel) { }
+        }
+        .alert("Mistakes Found", isPresented: $gameViewModel.showCustomBoardError) {
+            Button("OK") { gameViewModel.showCustomBoardError = false }
+        } message: {
+            Text("There are conflicts on the board. Please find and fix them to complete the puzzle.")
         }
         .sheet(isPresented: $gameViewModel.isSettingsPresented) {
             SettingsView(settings: settings)
