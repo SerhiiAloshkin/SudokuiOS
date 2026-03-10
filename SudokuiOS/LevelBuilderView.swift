@@ -142,9 +142,6 @@ struct LevelBuilderView: View {
                 BuilderToolButton(icon: "circle.fill", label: "B. Dot", isSelected: viewModel.selectedTool == .blackDot) {
                     viewModel.selectedTool = .blackDot
                 }
-                BuilderToolButton(icon: "square.stack.3d.up", label: "Sandwich", isSelected: viewModel.selectedTool == .sandwich) {
-                    viewModel.selectedTool = .sandwich
-                }
                 // Placeholder to ensure the last item can be fully seen even with the mask
                 Spacer().frame(width: 20)
             }
@@ -212,55 +209,69 @@ struct LevelBuilderView: View {
     
     private var gridMatrix: some View {
         GeometryReader { geo in
-            let availableWidth = max(1, min(geo.size.width, geo.size.height) - 32)
-            let cellSize = max(1, availableWidth / 9.0)
+            let cardPadding: CGFloat = 4
+            // Accommodation for exterior clues: 1 cell width + small gap
+            let totalCols: CGFloat = 10 
+            let calculatedCellSize = ((geo.size.width - 32 - (cardPadding * 2)) / totalCols).rounded(.down)
+            let cellSize = max(1, calculatedCellSize)
+            let boardSize = cellSize * 9
             
-            ZStack {
-                // Layer 1: Cell grid (base layer with tap targets)
-                cellsGrid(cellSize: cellSize)
-                
-                // Layer 2: Finalized shapes (same overlays as the actual game)
-                finalizedShapesOverlay(cellSize: cellSize)
-                
-                // Layer 3: In-progress shape (real-time visualization)
-                if viewModel.isShapeInProgress {
-                    activeShapeOverlay(cellSize: cellSize)
+            HStack(alignment: .top, spacing: 0) {
+                // Left Clues (Rows)
+                VStack(spacing: 0) {
+                    // Spacer for Top Clues alignment
+                    Color.clear.frame(width: cellSize, height: cellSize)
+                        .padding(.bottom, 8) 
+                    
+                    // Match card internal padding
+                    Color.clear.frame(height: cardPadding) 
+                    
+                    ForEach(0..<9, id: \.self) { i in
+                        sandwichClueButton(index: i, isRow: true, cellSize: cellSize)
+                    }
                 }
+                .padding(.trailing, 4)
                 
-                // Layer 4: Kropki dots
-                kropkiDotsOverlay(cellSize: cellSize)
-                
-                // Layer 5: Step numbers for active drawing
-                if viewModel.isShapeInProgress {
-                    stepNumbersOverlay(cellSize: cellSize)
+                VStack(spacing: 0) {
+                    // Top Clues (Columns)
+                    HStack(spacing: 0) {
+                        ForEach(0..<9, id: \.self) { i in
+                            sandwichClueButton(index: i, isRow: false, cellSize: cellSize)
+                        }
+                    }
+                    .padding(.bottom, 8)
+                    
+                    // The Grid Card
+                    ZStack {
+                        Color(UIColor.systemBackground)
+                        
+                        // Layer 1: Cell grid
+                        cellsGrid(cellSize: cellSize)
+                        
+                        // Layer 2: Finalized shapes
+                        finalizedShapesOverlay(cellSize: cellSize)
+                        
+                        // Layer 3: In-progress shape
+                        if viewModel.isShapeInProgress {
+                            activeShapeOverlay(cellSize: cellSize)
+                        }
+                        
+                        // Layer 4: Kropki dots
+                        kropkiDotsOverlay(cellSize: cellSize)
+                        
+                        // Layer 5: Step numbers
+                        if viewModel.isShapeInProgress {
+                            stepNumbersOverlay(cellSize: cellSize)
+                        }
+                    }
+                    .frame(width: boardSize, height: boardSize)
+                    .padding(cardPadding)
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(8)
+                    .shadow(color: .black.opacity(0.1), radius: 2)
                 }
             }
-            .frame(width: availableWidth, height: availableWidth)
-            .overlay(sandwichCluesOverlay(cellSize: cellSize))
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
-        }
-    }
-    
-    @ViewBuilder
-    private func sandwichCluesOverlay(cellSize: CGFloat) -> some View {
-        let isSandwichTool = viewModel.selectedTool == .sandwich
-        
-        ZStack {
-            // Column Clues (Top)
-            HStack(spacing: 0) {
-                ForEach(0..<9, id: \.self) { i in
-                    sandwichClueButton(index: i, isRow: false, cellSize: cellSize)
-                }
-            }
-            .offset(y: -(cellSize + 8))
-            
-            // Row Clues (Left)
-            VStack(spacing: 0) {
-                ForEach(0..<9, id: \.self) { i in
-                    sandwichClueButton(index: i, isRow: true, cellSize: cellSize)
-                }
-            }
-            .offset(x: -(cellSize + 8))
         }
     }
     
@@ -268,25 +279,20 @@ struct LevelBuilderView: View {
     private func sandwichClueButton(index: Int, isRow: Bool, cellSize: CGFloat) -> some View {
         let clue = isRow ? viewModel.sandwichRowClues[index] : viewModel.sandwichColClues[index]
         let isEraser = viewModel.selectedTool == .erase
-        let isSandwichTool = viewModel.selectedTool == .sandwich
         let hasClue = clue != nil
         
-        if isSandwichTool || hasClue || (isEraser && hasClue) {
-            Button(action: { viewModel.handleSandwichTap(index: index, isRow: isRow) }) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(hasClue ? Color.blue.opacity(0.1) : Color.gray.opacity(0.05))
-                        .frame(width: cellSize * 0.8, height: cellSize * 0.8)
-                    
-                    Text(hasClue ? "\(clue!)" : "-")
-                        .font(.system(size: cellSize * 0.4, weight: .bold, design: .rounded))
-                        .foregroundColor(hasClue ? .blue : .secondary.opacity(0.5))
-                }
+        Button(action: { viewModel.handleSandwichTap(index: index, isRow: isRow) }) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(hasClue ? Color.blue.opacity(0.1) : Color.gray.opacity(0.05))
+                    .frame(width: cellSize * 0.8, height: cellSize * 0.8)
+                
+                Text(hasClue ? "\(clue!)" : "-")
+                    .font(.system(size: cellSize * 0.4, weight: .bold, design: .rounded))
+                    .foregroundColor(hasClue ? .blue : .secondary.opacity(0.3))
             }
-            .frame(width: cellSize, height: cellSize)
-        } else {
-            Color.clear.frame(width: cellSize, height: cellSize)
         }
+        .frame(width: cellSize, height: cellSize)
     }
     
     // MARK: - Cells Grid (Fix 1: contentShape for reliable hit testing)

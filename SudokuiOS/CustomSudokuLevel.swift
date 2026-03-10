@@ -173,8 +173,8 @@ final class CustomSudokuLevel: Identifiable {
         }
         
         // Dynamic Sandwich Inference
-        let hasRowClues = rowClues != nil && !rowClues!.isEmpty && rowClues!.contains(where: { $0 > 0 })
-        let hasColClues = colClues != nil && !colClues!.isEmpty && colClues!.contains(where: { $0 > 0 })
+        let hasRowClues = rowClues != nil && !rowClues!.isEmpty && rowClues!.contains(where: { $0 >= 0 })
+        let hasColClues = colClues != nil && !colClues!.isEmpty && colClues!.contains(where: { $0 >= 0 })
         if (hasRowClues || hasColClues) && !typesArray.contains(.sandwich) {
             typesArray.append(.sandwich)
         }

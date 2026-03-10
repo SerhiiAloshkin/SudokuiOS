@@ -112,7 +112,6 @@ class LevelBuilderViewModel: ObservableObject {
         case whiteDot
         case blackDot
         case oddEven(String)
-        case sandwich
     }
     
     // MARK: - Init
@@ -232,11 +231,6 @@ class LevelBuilderViewModel: ObservableObject {
             handleShapeTap(cellId)
         case .whiteDot, .blackDot:
             handleKropkiTap(cellId)
-        case .sandwich:
-            // Tapping a cell with sandwich tool doesn't do much,
-            // but we could use it to toggle focus if we wanted.
-            // For now, sandwich clues are tapped OUTSIDE the grid.
-            break
         }
     }
     
