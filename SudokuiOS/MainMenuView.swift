@@ -301,6 +301,11 @@ struct MainMenuView: View {
                 )
                 session.userBoard = customLevel.savedBoardProgress
                 session.timeElapsed = customLevel.savedTime
+                session.notesData = customLevel.savedNotesData
+                session.colorData = customLevel.savedColorData
+                session.markedCombinationsData = customLevel.savedMarkedCombinationsData
+                session.killerMarkedCombinationsData = customLevel.savedKillerMarkedCombinationsData
+                session.crossData = customLevel.savedCrossData
                 self.activeSession = session
             } else if let data = UserDefaults.standard.data(forKey: "active_custom_session"),
                       let session = try? JSONDecoder().decode(GameSession.self, from: data) {

@@ -45,6 +45,7 @@ class SudokuGameViewModel: ObservableObject {
     @Published var selectedCellIndex: Int?
     @Published var isSolved: Bool = false
     @Published var isGameComplete: Bool = false 
+    @Published var customLevelUUID: String? = nil
     
     // Multi-Select
     @Published var isMultiSelectMode: Bool = false
@@ -302,6 +303,7 @@ class SudokuGameViewModel: ObservableObject {
         self.parityOverlay = level.parity
         self.isSolved = level.isSolved
         self.bestTime = level.bestTime
+        self.customLevelUUID = level.customUUID
         
         self.ruleType = level.ruleType
         // Hybrid Support: Use 'types' if available, otherwise fallback to single 'ruleType'
@@ -383,22 +385,21 @@ class SudokuGameViewModel: ObservableObject {
              }
         }
         
-        // 5. Load Persistent Object for History
-        if let level = parentViewModel.levels.first(where: { $0.id == levelID }) {
-            if let progress = parentViewModel.getProgress(for: levelID) {
-                self.levelProgress = progress
-                if let moves = progress.moves, !moves.isEmpty {
-                    self.historyIndex = moves.count - 1
-                }
-            } else {
-                if let context = parentViewModel.modelContext {
-                    let newProgress = UserLevelProgress(levelID: levelID, isSolved: level.isSolved)
-                    newProgress.currentUserBoard = self.currentBoard
-                    context.insert(newProgress)
-                    self.levelProgress = newProgress
-                    self.historyIndex = -1
-                    try? context.save()
-                }
+        // 5. Load Persistent Object for History (Move History, Undo/Redo)
+        if let progress = parentViewModel.getProgress(for: levelID) {
+            self.levelProgress = progress
+            if let moves = progress.moves, !moves.isEmpty {
+                self.historyIndex = moves.count - 1
+            }
+        } else {
+            // First time this level is played, create empty progress record for history
+            if let context = parentViewModel.modelContext {
+                let newProgress = UserLevelProgress(levelID: levelID, isSolved: self.isSolved)
+                newProgress.currentUserBoard = self.currentBoard
+                context.insert(newProgress)
+                self.levelProgress = newProgress
+                self.historyIndex = -1
+                try? context.save()
             }
         }
         
@@ -503,7 +504,7 @@ class SudokuGameViewModel: ObservableObject {
         var session = GameSession(
             levelID: levelID,
             isCustomLevel: isCustomLevel,
-            customLevelId: level.customUUID
+            customLevelId: customLevelUUID
         )
         
         // State Persistence: Capture current board string and metadata
@@ -587,8 +588,7 @@ class SudokuGameViewModel: ObservableObject {
         let killerMarkedCombinationsData = try? JSONEncoder().encode(markedKillerCombinations)
         let crossData = try? JSONEncoder().encode(crossesDict)
         
-        let customUUID = parentViewModel.levels.first(where: { $0.id == levelID })?.customUUID
-        parentViewModel.saveLevelProgress(levelId: levelID, customUUID: customUUID, currentBoard: currentBoardString, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, killerMarkedCombinationsData: killerMarkedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
+        parentViewModel.saveLevelProgress(levelId: levelID, customUUID: customLevelUUID, currentBoard: currentBoardString, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, killerMarkedCombinationsData: killerMarkedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
         
         // Also update Active Game Session (UserDefaults) to ensure "Continue" routing is accurate
         saveGameSession()
