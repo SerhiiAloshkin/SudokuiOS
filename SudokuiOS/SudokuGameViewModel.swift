@@ -1454,12 +1454,25 @@ class SudokuGameViewModel: ObservableObject {
     
     private func finalizeVictoryCheck() {
         // After wave completes, check if solved
-        let currentString = cells.map { String($0.value) }.joined()
-        if currentString == solution {
-             completeGame()
+        if isCustomLevel {
+            // Mathematical check for custom levels (since they have no solution array)
+            let validator = SudokuValidator()
+            let boardMatrix = (0..<9).map { r in
+                (0..<9).map { c in cells[r * 9 + c].value }
+            }
+            if validator.validate(board: boardMatrix, rules: activeRules) {
+                completeGame()
+            } else {
+                isWaveActive = false
+            }
         } else {
-            // Wave finished, mistakes revealed. Game continues.
-            isWaveActive = false 
+            let currentString = cells.map { String($0.value) }.joined()
+            if currentString == solution {
+                 completeGame()
+            } else {
+                // Wave finished, mistakes revealed. Game continues.
+                isWaveActive = false 
+            }
         }
     }
     
