@@ -169,9 +169,38 @@ class LevelBuilderViewModel: ObservableObject {
                 objectWillChange.send()
             }
         case .erase:
+            // 1. Clear Digit & Parity
             cells[cellId].value = 0
             cells[cellId].isClue = false
             cells[cellId].parity = nil
+            
+            // 2. Remove Whole Shapes (Thermos, Arrows, Cages)
+            thermoPaths.removeAll { path in
+                path.contains { coord in (coord[0] * 9 + coord[1]) == cellId }
+            }
+            
+            arrows.removeAll { arrow in
+                let headMatch = (arrow.bulb[0] * 9 + arrow.bulb[1]) == cellId
+                let bodyMatch = arrow.line.contains { coord in (coord[0] * 9 + coord[1]) == cellId }
+                return headMatch || bodyMatch
+            }
+            
+            cages.removeAll { cage in
+                cage.cells.contains { coord in (coord[0] * 9 + coord[1]) == cellId }
+            }
+            
+            // 3. Remove Point Constraints (Kropki)
+            whiteDots.removeAll { dot in
+                (dot.r1 * 9 + dot.c1 == cellId) || (dot.r2 * 9 + dot.c2 == cellId)
+            }
+            blackDots.removeAll { dot in
+                (dot.r1 * 9 + dot.c1 == cellId) || (dot.r2 * 9 + dot.c2 == cellId)
+            }
+            
+            // 4. Clear Active Drawing States
+            currentShapePath.removeAll()
+            kropkiFirstCell = nil
+            
             objectWillChange.send()
         case .oddEven(let parity):
             cells[cellId].parity = parity
