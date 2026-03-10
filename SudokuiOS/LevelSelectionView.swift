@@ -155,13 +155,10 @@ struct LevelSelectionView: View {
             hasScrolled = false
             
             // Sync data from global VM to local VM
-            selectionViewModel.updateLevels(globalViewModel.levels, customLevels: globalViewModel.customLevels)
+            selectionViewModel.updateLevels(globalViewModel.levels)
         }
         .onChange(of: globalViewModel.levels) { _, _ in
-            selectionViewModel.updateLevels(globalViewModel.levels, customLevels: globalViewModel.customLevels)
-        }
-        .onChange(of: globalViewModel.customLevels) { _, _ in
-            selectionViewModel.updateLevels(globalViewModel.levels, customLevels: globalViewModel.customLevels)
+            selectionViewModel.updateLevels(globalViewModel.levels)
         }
         .sheet(isPresented: $showLegend) {
             LevelIconsInfoView()

@@ -16,6 +16,12 @@ struct SudokuGameView: View {
         self.onNextLevel = onNextLevel
     }
     
+    init(level: SudokuLevel, viewModel: LevelViewModel, adCoordinator: AdCoordinator, onNextLevel: @escaping (Int) -> Void = { _ in }) {
+        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(level: level, levelViewModel: viewModel))
+        self.adCoordinator = adCoordinator
+        self.onNextLevel = onNextLevel
+    }
+    
     
     @Environment(\.presentationMode) var presentationMode
     @Environment(\.dismiss) var dismiss // Use dismiss for cleaner syntax

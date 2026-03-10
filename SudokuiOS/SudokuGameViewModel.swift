@@ -257,6 +257,19 @@ class SudokuGameViewModel: ObservableObject {
         startHintCooldownTimer()
     }
     
+    init(level: SudokuLevel, levelViewModel: LevelViewModel) {
+        self.levelID = level.id
+        self.parentViewModel = levelViewModel
+        
+        self.setupLevel(level)
+        
+        // Track Game Session for Persistence
+        saveGameSession()
+        
+        // Resume any active hint cooldown
+        startHintCooldownTimer()
+    }
+    
     private func loadLevelData() {
         // Ensure data is loaded in parent
         if parentViewModel.levels.isEmpty {
@@ -269,6 +282,10 @@ class SudokuGameViewModel: ObservableObject {
             return
         }
         
+        setupLevel(level)
+    }
+    
+    private func setupLevel(_ level: SudokuLevel) {
         // 1. Set Static Data (Clues & Solution)
         self.initialBoard = level.board ?? String(repeating: "0", count: 81)
         self.solution = level.solution ?? ""
@@ -299,9 +316,11 @@ class SudokuGameViewModel: ObservableObject {
             self.currentBoard = progress
             self.timeElapsed = level.timeElapsed
         } else {
-            self.currentBoard = self.initialBoard
+            self.currentBoard = initialBoard
             self.timeElapsed = 0
         }
+        
+        self.currentBoardArray = Self.parseBoardString(self.currentBoard)
         
         // 4. Reset Gameplay Stats
         self.mistakesCount = 0
@@ -479,11 +498,16 @@ class SudokuGameViewModel: ObservableObject {
             customLevelId: level.customUUID
         )
         
+        let sessionKey = isCustomLevel ? "active_custom_session" : "active_standard_session"
+        
         if let encoded = try? JSONEncoder().encode(session) {
-            UserDefaults.standard.set(encoded, forKey: "activeGameSession")
+            UserDefaults.standard.set(encoded, forKey: sessionKey)
         }
         
-        // Legacy Cleanup
+        // Track last played mode for "Continue" logic
+        UserDefaults.standard.set(isCustomLevel ? "custom" : "standard", forKey: "lastPlayedMode")
+        
+        // Legacy Cleanup/Sync (Optional but kept for compatibility if needed elsewhere)
         UserDefaults.standard.set(levelID, forKey: "lastUnfinishedLevelID")
         UserDefaults.standard.set(session.timestamp, forKey: "lastPlayedTimestamp")
          if let uuid = level.customUUID {

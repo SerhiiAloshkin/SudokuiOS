@@ -13,13 +13,13 @@ struct CustomGameWrapperView: View {
     @Environment(\.modelContext) private var modelContext
     @Binding var navigationStack: [MainMenuView.SudokuRoute]
     
-    @State private var levelID: Int? = nil
+    @State private var sudokuLevel: SudokuLevel? = nil
     
     var body: some View {
         Group {
-            if let id = levelID {
+            if let level = sudokuLevel {
                 SudokuGameView(
-                    levelID: id,
+                    level: level,
                     viewModel: viewModel,
                     adCoordinator: adCoordinator
                 )
@@ -28,30 +28,29 @@ struct CustomGameWrapperView: View {
             }
         }
         .onAppear {
-            guard levelID == nil else { return }
-            var sudokuLevel = customLevel.toSudokuLevel()
+            guard sudokuLevel == nil else { return }
+            var level = customLevel.toSudokuLevel()
             
             // Hydrate progress from SwiftData
-            let id = sudokuLevel.id
+            let id = level.id
             let descriptor = FetchDescriptor<UserLevelProgress>(predicate: #Predicate<UserLevelProgress> { progress in
                 progress.levelID == id
             })
             if let progress = try? modelContext.fetch(descriptor).first {
-                sudokuLevel.userProgress = progress.currentUserBoard
-                sudokuLevel.notesData = progress.notesData
-                sudokuLevel.colorData = progress.colorData
-                sudokuLevel.markedCombinationsData = progress.markedCombinationsData
-                sudokuLevel.killerMarkedCombinationsData = progress.killerMarkedCombinationsData
-                sudokuLevel.crossData = progress.crossData
-                sudokuLevel.timeElapsed = progress.timeElapsed
-                sudokuLevel.bestTime = progress.bestTime
-                sudokuLevel.isSolved = progress.isSolved
-                sudokuLevel.isPerfect = progress.isPerfect
-                sudokuLevel.mistakesMade = progress.mistakesMade
+                level.userProgress = progress.currentUserBoard
+                level.notesData = progress.notesData
+                level.colorData = progress.colorData
+                level.markedCombinationsData = progress.markedCombinationsData
+                level.killerMarkedCombinationsData = progress.killerMarkedCombinationsData
+                level.crossData = progress.crossData
+                level.timeElapsed = progress.timeElapsed
+                level.bestTime = progress.bestTime
+                level.isSolved = progress.isSolved
+                level.isPerfect = progress.isPerfect
+                level.mistakesMade = progress.mistakesMade
             }
             
-            viewModel.injectCustomLevel(sudokuLevel)
-            levelID = sudokuLevel.id
+            self.sudokuLevel = level
             // Store UUID for Continue button on app restart
             UserDefaults.standard.set(customLevel.id.uuidString, forKey: "lastCustomLevelUUID")
         }

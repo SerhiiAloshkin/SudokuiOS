@@ -125,54 +125,15 @@ struct MainMenuView: View {
                                         Button(action: {
                                             navigationPath = [.levelSelection, .game(levelID)]
                                         }) {
-                                            HStack {
-                                                VStack(alignment: .leading, spacing: 4) {
-                                                    Text("CONTINUE")
-                                                        .font(.caption)
-                                                        .fontWeight(.bold)
-                                                        .foregroundColor(.white.opacity(0.8))
-                                                        .tracking(1)
-                                                    
-                                                    Text("Level \(levelID)")
-                                                        .font(.title)
-                                                        .fontWeight(.black)
-                                                        .foregroundColor(.white)
-                                                    
-                                                    HStack(spacing: 6) {
-                                                        Image(systemName: level?.ruleType.iconName ?? "square.grid.3x3")
-                                                            .font(.caption)
-                                                        Text(level?.ruleType.displayName ?? "Sudoku")
-                                                            .font(.caption)
-                                                        
-                                                        let time = level?.timeElapsed ?? 0
-                                                        if time > 0 {
-                                                            Text("•")
-                                                            Text(formatTime(seconds: time))
-                                                                .font(.caption)
-                                                                .monospacedDigit()
-                                                        }
-                                                    }
-                                                    .foregroundColor(.white.opacity(0.9))
-                                                }
-                                                
-                                                Spacer()
-                                                
-                                                Image(systemName: "play.circle.fill")
-                                                    .font(.system(size: 40))
-                                                    .foregroundColor(.white)
-                                            }
-                                            .padding()
-                                            .background(
-                                                ZStack {
-                                                    Color.themeBlue
-                                                    LevelGridPattern()
-                                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                                }
+                                            continueCardContent(
+                                                title: "Level \(levelID)",
+                                                iconName: level?.ruleType.iconName ?? "square.grid.3x3",
+                                                ruleName: level?.ruleType.displayName ?? "Sudoku",
+                                                timeElapsed: level?.timeElapsed ?? 0
                                             )
-                                            .cornerRadius(16)
-                                            .shadow(color: Color.themeBlue.opacity(0.3), radius: 8, x: 0, y: 4)
+                                            .clipShape(RoundedRectangle(cornerRadius: 18))
                                         }
-                                        .buttonStyle(PlainButtonStyle())
+                                        .buttonStyle(.plain)
                                         .transition(.move(edge: .bottom).combined(with: .opacity))
                                     }
                                 }
@@ -352,9 +313,28 @@ struct MainMenuView: View {
         .shadow(color: Color.themeBlue.opacity(0.3), radius: 8, x: 0, y: 4)
     }
     private func loadSession() {
-        if let data = UserDefaults.standard.data(forKey: "activeGameSession"),
+        let lastPlayedMode = UserDefaults.standard.string(forKey: "lastPlayedMode") ?? "standard"
+        let sessionKey = (lastPlayedMode == "custom") ? "active_custom_session" : "active_standard_session"
+        
+        if let data = UserDefaults.standard.data(forKey: sessionKey),
            let session = try? JSONDecoder().decode(GameSession.self, from: data) {
             self.activeSession = session
+        } else if lastPlayedMode == "custom" {
+            // Fallback for custom: check "active_standard_session" if custom session not found?
+            // Actually, better if we just try both as fallbacks.
+            if let data = UserDefaults.standard.data(forKey: "active_standard_session"),
+               let session = try? JSONDecoder().decode(GameSession.self, from: data) {
+                self.activeSession = session
+            }
+        } else {
+            // Standard fallback
+            if let data = UserDefaults.standard.data(forKey: "active_custom_session"),
+               let session = try? JSONDecoder().decode(GameSession.self, from: data) {
+                self.activeSession = session
+            } else if let data = UserDefaults.standard.data(forKey: "activeGameSession"), // FINAL LEGACY FALLBACK
+                      let session = try? JSONDecoder().decode(GameSession.self, from: data) {
+                self.activeSession = session
+            }
         }
     }
     
