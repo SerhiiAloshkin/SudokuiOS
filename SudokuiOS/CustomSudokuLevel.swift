@@ -164,7 +164,7 @@ final class CustomSudokuLevel: Identifiable {
         }
         
         // Use unique negative ID from UUID hash to avoid collisions
-        let uniqueID = -abs(id.hashValue % 1_000_000) - 1
+        let uniqueID = -abs(id.hashValue % 1_000) - 1
         
         var level = SudokuLevel(
             id: uniqueID,
