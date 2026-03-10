@@ -20,8 +20,8 @@ struct MainMenuView: View {
         case levelBuilder
         case levelBuilderEdit(CustomSudokuLevel)
         case customLevels
-        case customGame(CustomSudokuLevel)
-        case game(Int)
+        case customGame(CustomSudokuLevel, session: GameSession?)
+        case game(Int, session: GameSession?)
         
         // Hashable conformance for CustomSudokuLevel
         static func == (lhs: SudokuRoute, rhs: SudokuRoute) -> Bool {
@@ -30,8 +30,8 @@ struct MainMenuView: View {
             case (.levelBuilder, .levelBuilder): return true
             case (.levelBuilderEdit(let a), .levelBuilderEdit(let b)): return a.id == b.id
             case (.customLevels, .customLevels): return true
-            case (.customGame(let a), .customGame(let b)): return a.id == b.id
-            case (.game(let a), .game(let b)): return a == b
+            case (.customGame(let a, let sa), .customGame(let b, let sb)): return a.id == b.id && sa == sb
+            case (.game(let a, let sa), .game(let b, let sb)): return a == b && sa == sb
             default: return false
             }
         }
@@ -42,8 +42,8 @@ struct MainMenuView: View {
             case .levelBuilder: hasher.combine("levelBuilder")
             case .levelBuilderEdit(let level): hasher.combine("levelBuilderEdit"); hasher.combine(level.id)
             case .customLevels: hasher.combine("customLevels")
-            case .customGame(let level): hasher.combine("customGame"); hasher.combine(level.id)
-            case .game(let id): hasher.combine("game"); hasher.combine(id)
+            case .customGame(let level, let session): hasher.combine("customGame"); hasher.combine(level.id); hasher.combine(session)
+            case .game(let id, let session): hasher.combine("game"); hasher.combine(id); hasher.combine(session)
             }
         }
     }
@@ -101,40 +101,37 @@ struct MainMenuView: View {
                                 if let session = activeSession ?? legacySession() {
                                     // Determine if it's a custom level or standard level
                                     let isCustom = session.isCustomLevel
-                                    let customLevel = isCustom ? customLevels.first(where: { $0.id.uuidString == session.customLevelId }) : nil
-                                    let standardLevel = !isCustom ? viewModel.levels.first(where: { $0.id == session.levelID }) : nil
                                     
-                                    if isCustom, let cl = customLevel {
-                                        // Custom level Continue
-                                        Button(action: {
-                                            navigationPath = [.customLevels, .customGame(cl)]
-                                        }) {
-                                            continueCardContent(
-                                                title: cl.levelName,
-                                                iconName: cl.ruleType.iconName,
-                                                ruleName: cl.ruleType.shortName,
-                                                timeElapsed: viewModel.getProgress(for: cl.toSudokuLevel().id)?.timeElapsed ?? 0
-                                            )
-                                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                                    if isCustom {
+                                        let customLevelID = session.customLevelId ?? lastCustomLevelUUID
+                                        if let customLevel = customLevels.first(where: { $0.id.uuidString == customLevelID }) {
+                                            Button(action: {
+                                                navigationPath = [.customGame(customLevel, session: session)]
+                                            }) {
+                                                continueCardContent(
+                                                    title: customLevel.levelName,
+                                                    iconName: customLevel.ruleType.iconName,
+                                                    ruleName: customLevel.ruleType.shortName,
+                                                    timeElapsed: session.timeElapsed
+                                                )
+                                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                                            }
+                                            .buttonStyle(.plain)
                                         }
-                                        .buttonStyle(.plain)
-                                    } else if !isCustom {
-                                        let levelID = session.levelID
-                                        let level = standardLevel // Might be nil if levels not loaded yet
-                                        
+                                    } else {
+                                        let level = viewModel.levels.first(where: { $0.id == session.levelID })
                                         Button(action: {
-                                            navigationPath = [.levelSelection, .game(levelID)]
+                                            navigationPath = [.game(session.levelID, session: session)]
                                         }) {
                                             continueCardContent(
-                                                title: "Level \(levelID)",
+                                                title: "Level \(session.levelID)",
                                                 iconName: level?.ruleType.iconName ?? "square.grid.3x3",
                                                 ruleName: level?.ruleType.displayName ?? "Sudoku",
-                                                timeElapsed: level?.timeElapsed ?? 0
+                                                timeElapsed: session.timeElapsed
                                             )
                                             .clipShape(RoundedRectangle(cornerRadius: 18))
                                         }
                                         .buttonStyle(.plain)
-                                        .transition(.move(edge: .bottom).combined(with: .opacity))
                                     }
                                 }
                                 // 2. Select Level (Primary Action)
@@ -204,22 +201,23 @@ struct MainMenuView: View {
                     LevelBuilderView(navigationStack: $navigationPath, existingLevel: level)
                 case .customLevels:
                     CustomLevelsListView(navigationStack: $navigationPath)
-                case .customGame(let customLevel):
+                case .customGame(let level, let session):
                     CustomGameWrapperView(
-                        customLevel: customLevel,
+                        customLevel: level,
                         viewModel: viewModel,
                         adCoordinator: adCoordinator,
-                        navigationStack: $navigationPath
+                        navigationStack: $navigationPath,
+                        session: session
                     )
-                case .game(let id):
-                     SudokuGameView(levelID: id, viewModel: viewModel, adCoordinator: adCoordinator, onNextLevel: { targetID in
+                case .game(let id, let session):
+                     SudokuGameView(levelID: id, viewModel: viewModel, adCoordinator: adCoordinator, session: session, onNextLevel: { targetID in
                          print("MainMenuView: traversing to next level \(targetID) from \(id)")
                          // Defer navigation to allow Ad dismissal to fully complete and view hierarchy to stabilize
                          DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                              if !navigationPath.isEmpty {
-                                 navigationPath[navigationPath.count - 1] = .game(targetID)
+                                 navigationPath[navigationPath.count - 1] = .game(targetID, session: nil)
                              } else {
-                                 navigationPath.append(.game(targetID))
+                                 navigationPath.append(.game(targetID, session: nil))
                              }
                          }
                      })

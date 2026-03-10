@@ -41,7 +41,7 @@ struct CustomLevelsListView: View {
                 List {
                     ForEach(levels) { level in
                         Button(action: {
-                            navigationStack.append(.customGame(level))
+                            navigationStack.append(.customGame(level, session: nil))
                         }) {
                             ZStack(alignment: .topTrailing) {
                                 customLevelRow(level)

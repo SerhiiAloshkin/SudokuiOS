@@ -1,16 +1,32 @@
 import Foundation
 
-struct GameSession: Codable {
+struct GameSession: Codable, Hashable {
     let levelID: Int
     let isCustomLevel: Bool
     let customLevelId: String? // UUID string
     let timestamp: Double
+    
+    // State Persistence
+    var userBoard: String?
+    var notesData: Data?
+    var colorData: Data?
+    var markedCombinationsData: Data?
+    var killerMarkedCombinationsData: Data?
+    var crossData: Data?
+    var timeElapsed: Int = 0
     
     enum CodingKeys: String, CodingKey {
         case levelID
         case isCustomLevel
         case customLevelId
         case timestamp
+        case userBoard
+        case notesData
+        case colorData
+        case markedCombinationsData
+        case killerMarkedCombinationsData
+        case crossData
+        case timeElapsed
     }
     
     init(levelID: Int, isCustomLevel: Bool, customLevelId: String?, timestamp: Double = Date().timeIntervalSince1970) {
@@ -26,5 +42,12 @@ struct GameSession: Codable {
         isCustomLevel = try container.decodeIfPresent(Bool.self, forKey: .isCustomLevel) ?? false
         customLevelId = try container.decodeIfPresent(String.self, forKey: .customLevelId)
         timestamp = try container.decodeIfPresent(Double.self, forKey: .timestamp) ?? Date().timeIntervalSince1970
+        userBoard = try container.decodeIfPresent(String.self, forKey: .userBoard)
+        notesData = try container.decodeIfPresent(Data.self, forKey: .notesData)
+        colorData = try container.decodeIfPresent(Data.self, forKey: .colorData)
+        markedCombinationsData = try container.decodeIfPresent(Data.self, forKey: .markedCombinationsData)
+        killerMarkedCombinationsData = try container.decodeIfPresent(Data.self, forKey: .killerMarkedCombinationsData)
+        crossData = try container.decodeIfPresent(Data.self, forKey: .crossData)
+        timeElapsed = try container.decodeIfPresent(Int.self, forKey: .timeElapsed) ?? 0
     }
 }

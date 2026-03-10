@@ -12,6 +12,7 @@ struct CustomGameWrapperView: View {
     @ObservedObject var adCoordinator: AdCoordinator
     @Environment(\.modelContext) private var modelContext
     @Binding var navigationStack: [MainMenuView.SudokuRoute]
+    let session: GameSession?
     
     @State private var sudokuLevel: SudokuLevel? = nil
     
@@ -21,7 +22,8 @@ struct CustomGameWrapperView: View {
                 SudokuGameView(
                     level: level,
                     viewModel: viewModel,
-                    adCoordinator: adCoordinator
+                    adCoordinator: adCoordinator,
+                    session: session
                 )
             } else {
                 ProgressView("Loading level...")

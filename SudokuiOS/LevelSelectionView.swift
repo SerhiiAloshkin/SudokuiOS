@@ -170,7 +170,7 @@ struct LevelSelectionView: View {
                 // Determine logic based on whether we are already in a game loop or menu
                 // Here we simply append to the stack
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                     navigationStack.append(MainMenuView.SudokuRoute.game(level.id))
+                     navigationStack.append(MainMenuView.SudokuRoute.game(level.id, session: nil))
                 }
                 levelToPlay = nil // Reset
             }

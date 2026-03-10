@@ -244,11 +244,11 @@ class SudokuGameViewModel: ObservableObject {
     
     var cellCrosses: [Int: Bool] = [:] // Temporary storage during init
     
-    init(levelID: Int, levelViewModel: LevelViewModel) {
+    init(levelID: Int, levelViewModel: LevelViewModel, session: GameSession? = nil) {
         self.levelID = levelID
         self.parentViewModel = levelViewModel
 
-        loadLevelData()
+        loadLevelData(session: session)
         
         // Track Game Session for Persistence
         saveGameSession()
@@ -257,11 +257,11 @@ class SudokuGameViewModel: ObservableObject {
         startHintCooldownTimer()
     }
     
-    init(level: SudokuLevel, levelViewModel: LevelViewModel) {
+    init(level: SudokuLevel, levelViewModel: LevelViewModel, session: GameSession? = nil) {
         self.levelID = level.id
         self.parentViewModel = levelViewModel
         
-        self.setupLevel(level)
+        self.setupLevel(level, session: session)
         
         // Track Game Session for Persistence
         saveGameSession()
@@ -270,7 +270,7 @@ class SudokuGameViewModel: ObservableObject {
         startHintCooldownTimer()
     }
     
-    private func loadLevelData() {
+    private func loadLevelData(session: GameSession? = nil) {
         // Ensure data is loaded in parent
         if parentViewModel.levels.isEmpty {
             parentViewModel.loadLevelsFromJSON()
@@ -282,10 +282,10 @@ class SudokuGameViewModel: ObservableObject {
             return
         }
         
-        setupLevel(level)
+        setupLevel(level, session: session)
     }
     
-    private func setupLevel(_ level: SudokuLevel) {
+    private func setupLevel(_ level: SudokuLevel, session: GameSession? = nil) {
         // 1. Set Static Data (Clues & Solution)
         self.initialBoard = level.board ?? String(repeating: "0", count: 81)
         self.solution = level.solution ?? ""
@@ -311,8 +311,11 @@ class SudokuGameViewModel: ObservableObject {
             self.rules = [level.ruleType]
         }
         
-        // 2. Set Current State (User Progress > Static Board)
-        if let progress = level.userProgress {
+        // 2. Set Current State (Session > User Progress > Static Board)
+        if let session = session, let board = session.userBoard {
+            self.currentBoard = board
+            self.timeElapsed = session.timeElapsed
+        } else if let progress = level.userProgress {
             self.currentBoard = progress
             self.timeElapsed = level.timeElapsed
         } else {
@@ -329,8 +332,9 @@ class SudokuGameViewModel: ObservableObject {
         self.hintCooldownRemaining = 0
         self.hintCooldownTimer?.invalidate()
         
-        // 5. Load Notes
-        if let notesData = level.notesData {
+        // 5. Load Notes (Prioritize Session)
+        let resolvedNotesData = (session?.notesData != nil) ? session?.notesData : level.notesData
+        if let notesData = resolvedNotesData {
             if let decodedStringNotes = try? JSONDecoder().decode([String: Set<Int>].self, from: notesData) {
                 self.notes = Dictionary(uniqueKeysWithValues: decodedStringNotes.compactMap { (key, val) in
                     guard let intKey = Int(key) else { return nil }
@@ -341,8 +345,9 @@ class SudokuGameViewModel: ObservableObject {
             }
         }
         
-        // 5. Load Colors
-        if let colorData = level.colorData {
+        // 5b. Load Colors (Prioritize Session)
+        let resolvedColorData = (session?.colorData != nil) ? session?.colorData : level.colorData
+        if let colorData = resolvedColorData {
              if let decodedStringColors = try? JSONDecoder().decode([String: Int].self, from: colorData) {
                  self.cellColors = Dictionary(uniqueKeysWithValues: decodedStringColors.compactMap { (key, val) in
                      guard let intKey = Int(key) else { return nil }
@@ -353,23 +358,26 @@ class SudokuGameViewModel: ObservableObject {
              }
         }
         
-        // 6. Load Marked Combinations (Sandwich)
-        if let comboData = level.markedCombinationsData {
+        // 6. Load Marked Combinations (Prioritize Session)
+        let resolvedComboData = (session?.markedCombinationsData != nil) ? session?.markedCombinationsData : level.markedCombinationsData
+        if let comboData = resolvedComboData {
             if let decodedCombos = try? JSONDecoder().decode([String: Set<[Int]>].self, from: comboData) {
                 self.markedCombinations = decodedCombos
             }
         }
         
-        // 6b. Load Marked Killer Combinations
-        if let killerComboData = level.killerMarkedCombinationsData {
+        // 6b. Load Marked Killer Combinations (Prioritize Session)
+        let resolvedKillerComboData = (session?.killerMarkedCombinationsData != nil) ? session?.killerMarkedCombinationsData : level.killerMarkedCombinationsData
+        if let killerComboData = resolvedKillerComboData {
             if let decodedKillerCombos = try? JSONDecoder().decode([String: Set<[Int]>].self, from: killerComboData) {
                 self.markedKillerCombinations = decodedKillerCombos
             }
         }
 
         
-        // 7. Load Cross Data (Sandwich)
-        if let crossData = level.crossData {
+        // 7. Load Cross Data (Prioritize Session)
+        let resolvedCrossData = (session?.crossData != nil) ? session?.crossData : level.crossData
+        if let crossData = resolvedCrossData {
              if let decodedCrosses = try? JSONDecoder().decode([Int: Bool].self, from: crossData) {
                  self.cellCrosses = decodedCrosses
              }
@@ -492,11 +500,33 @@ class SudokuGameViewModel: ObservableObject {
     func saveGameSession() {
         guard let level = parentViewModel.levels.first(where: { $0.id == levelID }) else { return }
         
-        let session = GameSession(
+        var session = GameSession(
             levelID: levelID,
             isCustomLevel: isCustomLevel,
             customLevelId: level.customUUID
         )
+        
+        // State Persistence: Capture current board string and metadata
+        var chars = [Character]()
+        chars.reserveCapacity(81)
+        var notesDict: [String: Set<Int>] = [:]
+        var colorsDict: [String: Int] = [:]
+        var crossesDict: [Int: Bool] = [:]
+        
+        for cell in cells {
+            chars.append(Character(String(cell.value)))
+            if !cell.notes.isEmpty { notesDict[String(cell.id)] = cell.notes }
+            if let color = cell.color { colorsDict[String(cell.id)] = color }
+            if cell.hasCross { crossesDict[cell.id] = true }
+        }
+        
+        session.userBoard = String(chars)
+        session.notesData = try? JSONEncoder().encode(notesDict)
+        session.colorData = try? JSONEncoder().encode(colorsDict)
+        session.markedCombinationsData = try? JSONEncoder().encode(markedCombinations)
+        session.killerMarkedCombinationsData = try? JSONEncoder().encode(markedKillerCombinations)
+        session.crossData = try? JSONEncoder().encode(crossesDict)
+        session.timeElapsed = timeElapsed
         
         let sessionKey = isCustomLevel ? "active_custom_session" : "active_standard_session"
         
@@ -551,6 +581,9 @@ class SudokuGameViewModel: ObservableObject {
         let crossData = try? JSONEncoder().encode(crossesDict)
         
         parentViewModel.saveLevelProgress(levelId: levelID, currentBoard: currentBoardString, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, killerMarkedCombinationsData: killerMarkedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
+        
+        // Also update Active Game Session (UserDefaults) to ensure "Continue" routing is accurate
+        saveGameSession()
     }
     
     // MARK: - Input Logic

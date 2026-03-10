@@ -10,14 +10,14 @@ struct SudokuGameView: View {
     var onNextLevel: (Int) -> Void = { _ in } // Callback for next level navigation, receives Target ID
     @ObservedObject var adCoordinator: AdCoordinator // Injected for Rewarded Ads
     
-    init(levelID: Int, viewModel: LevelViewModel, adCoordinator: AdCoordinator, onNextLevel: @escaping (Int) -> Void = { _ in }) {
-        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(levelID: levelID, levelViewModel: viewModel))
+    init(levelID: Int, viewModel: LevelViewModel, adCoordinator: AdCoordinator, session: GameSession? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
+        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(levelID: levelID, levelViewModel: viewModel, session: session))
         self.adCoordinator = adCoordinator
         self.onNextLevel = onNextLevel
     }
     
-    init(level: SudokuLevel, viewModel: LevelViewModel, adCoordinator: AdCoordinator, onNextLevel: @escaping (Int) -> Void = { _ in }) {
-        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(level: level, levelViewModel: viewModel))
+    init(level: SudokuLevel, viewModel: LevelViewModel, adCoordinator: AdCoordinator, session: GameSession? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
+        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(level: level, levelViewModel: viewModel, session: session))
         self.adCoordinator = adCoordinator
         self.onNextLevel = onNextLevel
     }
