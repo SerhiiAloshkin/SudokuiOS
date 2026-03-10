@@ -136,11 +136,8 @@ struct LevelBuilderView: View {
                 BuilderToolButton(icon: "circle.square", label: "Odd/Even", isSelected: isOddEvenTool) {
                     viewModel.selectedTool = .oddEven("1")
                 }
-                BuilderToolButton(icon: "circle", label: "W. Dot", isSelected: viewModel.selectedTool == .whiteDot) {
-                    viewModel.selectedTool = .whiteDot
-                }
-                BuilderToolButton(icon: "circle.fill", label: "B. Dot", isSelected: viewModel.selectedTool == .blackDot) {
-                    viewModel.selectedTool = .blackDot
+                BuilderToolButton(icon: "circle.grid.2x1", label: "Kropki", isSelected: viewModel.selectedTool == .kropki) {
+                    viewModel.selectedTool = .kropki
                 }
                 // Placeholder to ensure the last item can be fully seen even with the mask
                 Spacer().frame(width: 20)
@@ -167,6 +164,7 @@ struct LevelBuilderView: View {
         ZStack {
             if isDigitTool { digitPicker }
             else if isOddEvenTool { oddEvenPicker }
+            else if viewModel.selectedTool == .kropki { kropkiPicker }
             else if viewModel.isShapeInProgress { shapeControls }
         }
         .frame(height: 44)
@@ -545,6 +543,7 @@ struct LevelBuilderView: View {
         if case .digit = viewModel.selectedTool { return true }; return false
     }
     var isCageTool: Bool { viewModel.selectedTool == .cage }
+    var isKropkiTool: Bool { viewModel.selectedTool == .kropki }
     var isOddEvenTool: Bool {
         if case .oddEven = viewModel.selectedTool { return true }; return false
     }
@@ -586,6 +585,26 @@ struct LevelBuilderView: View {
             .padding(.horizontal, 14).padding(.vertical, 6)
             .background(currentParity == "2" ? Color.orange : Color(uiColor: .systemGray5))
             .foregroundColor(currentParity == "2" ? .white : .primary)
+            .cornerRadius(8)
+        }
+    }
+    
+    var kropkiPicker: some View {
+        HStack(spacing: 12) {
+            Button(action: { viewModel.selectedKropkiType = .white }) {
+                Label("White", systemImage: "circle").font(.subheadline).fontWeight(.medium)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .background(viewModel.selectedKropkiType == .white ? Color.blue : Color(uiColor: .systemGray5))
+            .foregroundColor(viewModel.selectedKropkiType == .white ? .white : .primary)
+            .cornerRadius(8)
+            
+            Button(action: { viewModel.selectedKropkiType = .black }) {
+                Label("Black", systemImage: "circle.fill").font(.subheadline).fontWeight(.medium)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .background(viewModel.selectedKropkiType == .black ? Color.black : Color(uiColor: .systemGray5))
+            .foregroundColor(viewModel.selectedKropkiType == .black ? .white : .primary)
             .cornerRadius(8)
         }
     }

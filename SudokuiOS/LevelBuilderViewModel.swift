@@ -109,10 +109,16 @@ class LevelBuilderViewModel: ObservableObject {
         case thermo
         case arrow
         case cage
-        case whiteDot
-        case blackDot
+        case kropki
         case oddEven(String)
     }
+    
+    enum KropkiType {
+        case white
+        case black
+    }
+    
+    @Published var selectedKropkiType: KropkiType = .white
     
     // MARK: - Init
     
@@ -229,7 +235,7 @@ class LevelBuilderViewModel: ObservableObject {
             objectWillChange.send()
         case .thermo, .arrow, .cage:
             handleShapeTap(cellId)
-        case .whiteDot, .blackDot:
+        case .kropki:
             handleKropkiTap(cellId)
         }
     }
@@ -277,9 +283,18 @@ class LevelBuilderViewModel: ObservableObject {
         }
         
         // Check adjacency
-        guard isAdjacent(lastCell, cellId) else {
-            triggerInvalidFeedback()
-            return
+        if selectedTool == .cage {
+            // Killer Cage: Orthogonally adjacent to ANY cell in path
+            guard isOrthogonallyAdjacentToAny(cellId, in: currentShapePath) else {
+                triggerInvalidFeedback()
+                return
+            }
+        } else {
+            // Thermo/Arrow: Adjacent (inc. diagonal) to the LAST cell
+            guard isAdjacent(lastCell, cellId) else {
+                triggerInvalidFeedback()
+                return
+            }
         }
         
         // Check max length
@@ -337,23 +352,21 @@ class LevelBuilderViewModel: ObservableObject {
     // MARK: - Kropki Dot Placement (Req 4)
     
     private func handleKropkiTap(_ cellId: Int) {
-        guard selectedTool == .whiteDot || selectedTool == .blackDot else { return }
-        
         if let firstCell = kropkiFirstCell {
-            if isAdjacent(firstCell, cellId) {
+            if isOrthogonallyAdjacent(firstCell, cellId) {
                 // Place dot between A and B
                 let r1 = firstCell / 9, c1 = firstCell % 9
                 let r2 = cellId / 9, c2 = cellId % 9
                 let dot = SudokuLevel.KropkiDot(r1: r1, c1: c1, r2: r2, c2: c2)
                 
-                if selectedTool == .whiteDot {
+                if selectedKropkiType == .white {
                     whiteDots.append(dot)
                 } else {
                     blackDots.append(dot)
                 }
                 kropkiFirstCell = nil
             } else {
-                // Not adjacent — reassign
+                // Not orthogonally adjacent — reset or ignore
                 kropkiFirstCell = cellId
             }
         } else {
@@ -370,6 +383,16 @@ class LevelBuilderViewModel: ObservableObject {
         let dR = abs(r1 - r2)
         let dC = abs(c1 - c2)
         return (dR <= 1 && dC <= 1) && !(dR == 0 && dC == 0)
+    }
+    
+    private func isOrthogonallyAdjacent(_ a: Int, _ b: Int) -> Bool {
+        let r1 = a / 9, c1 = a % 9
+        let r2 = b / 9, c2 = b % 9
+        return abs(r1 - r2) + abs(c1 - c2) == 1
+    }
+    
+    private func isOrthogonallyAdjacentToAny(_ cellId: Int, in path: [Int]) -> Bool {
+        return path.contains { isOrthogonallyAdjacent($0, cellId) }
     }
     
     private func getMaxLength(for tool: BuilderTool) -> Int {
