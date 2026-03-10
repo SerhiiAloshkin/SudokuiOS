@@ -22,30 +22,6 @@ struct MainMenuView: View {
         case customLevels
         case customGame(CustomSudokuLevel, session: GameSession?)
         case game(Int, session: GameSession?)
-        
-        // Hashable conformance for CustomSudokuLevel
-        static func == (lhs: SudokuRoute, rhs: SudokuRoute) -> Bool {
-            switch (lhs, rhs) {
-            case (.levelSelection, .levelSelection): return true
-            case (.levelBuilder, .levelBuilder): return true
-            case (.levelBuilderEdit(let a), .levelBuilderEdit(let b)): return a.id == b.id
-            case (.customLevels, .customLevels): return true
-            case (.customGame(let a, let sa), .customGame(let b, let sb)): return a.id == b.id && sa == sb
-            case (.game(let a, let sa), .game(let b, let sb)): return a == b && sa == sb
-            default: return false
-            }
-        }
-        
-        func hash(into hasher: inout Hasher) {
-            switch self {
-            case .levelSelection: hasher.combine("levelSelection")
-            case .levelBuilder: hasher.combine("levelBuilder")
-            case .levelBuilderEdit(let level): hasher.combine("levelBuilderEdit"); hasher.combine(level.id)
-            case .customLevels: hasher.combine("customLevels")
-            case .customGame(let level, let session): hasher.combine("customGame"); hasher.combine(level.id); hasher.combine(session)
-            case .game(let id, let session): hasher.combine("game"); hasher.combine(id); hasher.combine(session)
-            }
-        }
     }
     
     var body: some View {
@@ -319,13 +295,14 @@ struct MainMenuView: View {
                customLevel.savedBoardProgress != nil {
                 // Return a "Skeleton" session to satisfy the UI, although we could also 
                 // refactor the UI to check both. For now, feeding a minimal session is safest.
-                self.activeSession = GameSession(
+                var session = GameSession(
                     levelID: -1, // Not used for custom
                     isCustomLevel: true,
-                    customLevelId: lastCustomLevelUUID,
-                    userBoard: customLevel.savedBoardProgress,
-                    timeElapsed: customLevel.savedTime
+                    customLevelId: lastCustomLevelUUID
                 )
+                session.userBoard = customLevel.savedBoardProgress
+                session.timeElapsed = customLevel.savedTime
+                self.activeSession = session
             } else if let data = UserDefaults.standard.data(forKey: "active_custom_session"),
                       let session = try? JSONDecoder().decode(GameSession.self, from: data) {
                 self.activeSession = session

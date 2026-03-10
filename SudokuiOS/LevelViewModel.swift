@@ -479,7 +479,7 @@ class LevelViewModel: ObservableObject {
     //     }
     // }
     
-    func saveProgress(levelId: Int, timeElapsed: Int, isPerfect: Bool = false, mistakesMade: Int = 0) {
+    func saveProgress(levelId: Int, customUUID: String? = nil, timeElapsed: Int, isPerfect: Bool = false, mistakesMade: Int = 0) {
         // 1. Update In-Memory
         let newTime = Double(timeElapsed)
         if let index = levels.firstIndex(where: { $0.id == levelId }) {
@@ -526,7 +526,9 @@ class LevelViewModel: ObservableObject {
             let descriptor = FetchDescriptor<CustomSudokuLevel>(predicate: #Predicate<CustomSudokuLevel> { level in
                 level.id == uuid
             })
-            if let customLevel = try? context.fetch(descriptor).first {
+            // Explicit type to help compiler inference
+            let results: [CustomSudokuLevel] = (try? context.fetch(descriptor)) ?? []
+            if let customLevel = results.first {
                 customLevel.isSolved = true
                 if customLevel.bestTime == 0 || newTime < customLevel.bestTime {
                     customLevel.bestTime = newTime
@@ -534,7 +536,7 @@ class LevelViewModel: ObservableObject {
             }
         }
         
-        do { try context.save() } catch { print("Failed to save solved status: \(error)") }
+        do { try context.save() } catch { print("Failed to save progress: \(error)") }
         
         // Cloud Sync Disabled
         // CloudStorageManager.shared.markLevelSolved(levelId)
@@ -729,7 +731,7 @@ class LevelViewModel: ObservableObject {
         if let index = levels.firstIndex(where: { $0.id == id }) {
             levels[index].isSolved = true
             levels[index].mistakesMade = mistakesMade
-            saveProgress(levelId: id, timeElapsed: timeElapsed, isPerfect: isPerfect, mistakesMade: mistakesMade)
+        saveProgress(levelId: id, customUUID: customUUID, timeElapsed: timeElapsed, isPerfect: isPerfect, mistakesMade: mistakesMade)
             
             // Unlock Next Level (Sequential)
             let nextID = id + 1

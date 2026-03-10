@@ -29,10 +29,12 @@ struct GameSession: Codable, Hashable {
         case timeElapsed
     }
     
-    init(levelID: Int, isCustomLevel: Bool, customLevelId: String?, timestamp: Double = Date().timeIntervalSince1970) {
+    init(levelID: Int, isCustomLevel: Bool, customLevelId: String?, userBoard: String? = nil, timeElapsed: Int = 0, timestamp: Double = Date().timeIntervalSince1970) {
         self.levelID = levelID
         self.isCustomLevel = isCustomLevel
         self.customLevelId = customLevelId
+        self.userBoard = userBoard
+        self.timeElapsed = timeElapsed
         self.timestamp = timestamp
     }
     
