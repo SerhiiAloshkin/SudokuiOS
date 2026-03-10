@@ -288,7 +288,6 @@ struct MainMenuView: View {
     }
     private func loadSession() {
         let lastPlayedMode = UserDefaults.standard.string(forKey: "lastPlayedMode") ?? "standard"
-        let sessionKey = (lastPlayedMode == "custom") ? "active_custom_session" : "active_standard_session"
         
         if lastPlayedMode == "custom" {
             if let customLevel = customLevels.first(where: { $0.id.uuidString == lastCustomLevelUUID }),

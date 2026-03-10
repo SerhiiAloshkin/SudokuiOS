@@ -203,7 +203,7 @@ struct LevelCardView: View {
             if level.isLocked {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color(uiColor: .systemGray6))
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 1, y: 1) // Inner shadow simulation via drop shadow on content? No, need inner.
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 1, y: 1)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(Color.black.opacity(0.1), lineWidth: 2)
@@ -212,16 +212,15 @@ struct LevelCardView: View {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(
                         LinearGradient(
-                            gradient: Gradient(colors: [Color.blue, Color.cyan]), // Slight gradient
+                            gradient: Gradient(colors: [Color.blue, Color.cyan]),
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2) // Drop shadow for depth
+                    .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2)
             }
             
-            // 2. Faint 3x3 Grid Overlay (on EVERY button per request)
-            // Using a custom shape or standard lines
+            // 2. Faint 3x3 Grid Overlay
             LevelGridPattern()
                 .stroke(gridLineColor, lineWidth: 1)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -230,24 +229,27 @@ struct LevelCardView: View {
             Text("\(level.id)")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(numberColor)
-                .shadow(color: level.isLocked ? .clear : .black.opacity(0.2), radius: 1, x: 0, y: 1) // Text shadow for active
-            
+                .shadow(color: level.isLocked ? .clear : .black.opacity(0.2), radius: 1, x: 0, y: 1)
+        }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .overlay(
             // 4. Corner Overlays
             VStack {
                 HStack {
                     Spacer()
-                    // Top-Right: Green Check (No white background)
+                    // Top-Right: Green Check
                     if level.isSolved {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green) // Pure green check
+                            .foregroundColor(.green)
                             .font(.system(size: 16))
-                            .padding(4)
-                            .background(Circle().fill(Color.white.opacity(0.8)).padding(4)) // Added backing for visibility
+                            .padding(2)
+                            .background(Circle().fill(Color.white.opacity(0.8)).padding(2))
                     }
                 }
                 Spacer()
                 HStack {
-                    // Bottom-Left: Variant Icons (Hybrid Support)
+                    // Bottom-Left: Variant Icons
                     LevelIconView(level: level, iconColor: iconColor)
                     
                     Spacer()
@@ -261,8 +263,8 @@ struct LevelCardView: View {
                     }
                 }
             }
-            .padding(3) // Pull icons away from the edges
-        }
+            .padding(3)
+        )
     }
     
     // -- Colors --
@@ -350,7 +352,6 @@ struct LevelItemView: View {
     var body: some View {
         Button(action: action) {
             LevelCardView(level: level)
-                .aspectRatio(1, contentMode: .fit)
         }
     }
 }
