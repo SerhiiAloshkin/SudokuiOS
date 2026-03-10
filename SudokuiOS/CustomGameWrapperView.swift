@@ -33,24 +33,17 @@ struct CustomGameWrapperView: View {
             guard sudokuLevel == nil else { return }
             var level = customLevel.toSudokuLevel()
             
-            // Hydrate progress from SwiftData
-            let id = level.id
-            let descriptor = FetchDescriptor<UserLevelProgress>(predicate: #Predicate<UserLevelProgress> { progress in
-                progress.levelID == id
-            })
-            if let progress = try? modelContext.fetch(descriptor).first {
-                level.userProgress = progress.currentUserBoard
-                level.notesData = progress.notesData
-                level.colorData = progress.colorData
-                level.markedCombinationsData = progress.markedCombinationsData
-                level.killerMarkedCombinationsData = progress.killerMarkedCombinationsData
-                level.crossData = progress.crossData
-                level.timeElapsed = progress.timeElapsed
-                level.bestTime = progress.bestTime
-                level.isSolved = progress.isSolved
-                level.isPerfect = progress.isPerfect
-                level.mistakesMade = progress.mistakesMade
-            }
+            // Hydrate progress from CustomSudokuLevel directly (SwiftData)
+            level.userProgress = customLevel.savedBoardProgress
+            level.notesData = customLevel.savedNotesData
+            level.colorData = customLevel.savedColorData
+            level.markedCombinationsData = customLevel.savedMarkedCombinationsData
+            level.killerMarkedCombinationsData = customLevel.savedKillerMarkedCombinationsData
+            level.crossData = customLevel.savedCrossData
+            level.timeElapsed = customLevel.savedTime
+            level.isSolved = customLevel.isSolved
+            // Note: mistakesMade and isPerfect are not yet stored on CustomSudokuLevel,
+            // but for custom games we primarily care about board state and isSolved.
             
             self.sudokuLevel = level
             // Store UUID for Continue button on app restart

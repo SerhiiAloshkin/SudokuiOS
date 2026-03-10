@@ -35,6 +35,15 @@ final class CustomSudokuLevel: Identifiable {
     var sandwichRowCluesData: Data?
     var sandwichColCluesData: Data?
     
+    // MARK: - Persistent Game Progress
+    var savedBoardProgress: String?
+    var savedNotesData: Data?
+    var savedColorData: Data?
+    var savedMarkedCombinationsData: Data?
+    var savedKillerMarkedCombinationsData: Data?
+    var savedCrossData: Data?
+    var savedTime: Int = 0
+    
     init(
         id: UUID = UUID(),
         levelName: String = "Untitled",
@@ -197,6 +206,15 @@ final class CustomSudokuLevel: Identifiable {
         level.rowClues = rowClues
         level.colClues = colClues
         level.parity = parityString
+        
+        // Populate Progress
+        level.userProgress = savedBoardProgress
+        level.notesData = savedNotesData
+        level.colorData = savedColorData
+        level.markedCombinationsData = savedMarkedCombinationsData
+        level.killerMarkedCombinationsData = savedKillerMarkedCombinationsData
+        level.crossData = savedCrossData
+        level.timeElapsed = savedTime
         
         return level
     }

@@ -521,13 +521,26 @@ class LevelViewModel: ObservableObject {
             context.insert(newProgress)
         }
         
+        // --- NEW: Update Custom Level Solved Status ---
+        if let uuidString = customUUID, let uuid = UUID(uuidString: uuidString) {
+            let descriptor = FetchDescriptor<CustomSudokuLevel>(predicate: #Predicate<CustomSudokuLevel> { level in
+                level.id == uuid
+            })
+            if let customLevel = try? context.fetch(descriptor).first {
+                customLevel.isSolved = true
+                if customLevel.bestTime == 0 || newTime < customLevel.bestTime {
+                    customLevel.bestTime = newTime
+                }
+            }
+        }
+        
         do { try context.save() } catch { print("Failed to save solved status: \(error)") }
         
         // Cloud Sync Disabled
         // CloudStorageManager.shared.markLevelSolved(levelId)
     }
     
-    func saveLevelProgress(levelId: Int, currentBoard: String, notesData: Data? = nil, colorData: Data? = nil, markedCombinationsData: Data? = nil, killerMarkedCombinationsData: Data? = nil, crossData: Data? = nil, timeElapsed: Int = 0) {
+    func saveLevelProgress(levelId: Int, customUUID: String? = nil, currentBoard: String, notesData: Data? = nil, colorData: Data? = nil, markedCombinationsData: Data? = nil, killerMarkedCombinationsData: Data? = nil, crossData: Data? = nil, timeElapsed: Int = 0) {
         guard let context = modelContext else { return }
         
         if let progress = fetchProgress(for: levelId, in: context) {
@@ -541,6 +554,22 @@ class LevelViewModel: ObservableObject {
         } else {
             let newProgress = UserLevelProgress(levelID: levelId, currentUserBoard: currentBoard, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, killerMarkedCombinationsData: killerMarkedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
             context.insert(newProgress)
+        }
+        
+        // --- NEW: Direct Custom Level Persistence ---
+        if let uuidString = customUUID, let uuid = UUID(uuidString: uuidString) {
+            let descriptor = FetchDescriptor<CustomSudokuLevel>(predicate: #Predicate<CustomSudokuLevel> { level in
+                level.id == uuid
+            })
+            if let customLevel = try? context.fetch(descriptor).first {
+                customLevel.savedBoardProgress = currentBoard
+                customLevel.savedNotesData = notesData
+                customLevel.savedColorData = colorData
+                customLevel.savedMarkedCombinationsData = markedCombinationsData
+                customLevel.savedKillerMarkedCombinationsData = killerMarkedCombinationsData
+                customLevel.savedCrossData = crossData
+                customLevel.savedTime = timeElapsed
+            }
         }
         
         // Update in-memory
@@ -694,7 +723,7 @@ class LevelViewModel: ObservableObject {
         }
     }
 
-    func levelSolved(id: Int, timeElapsed: Int, isPerfect: Bool = false, mistakesMade: Int = 0) {
+    func levelSolved(id: Int, customUUID: String? = nil, timeElapsed: Int, isPerfect: Bool, mistakesMade: Int) {
         // Unlock Logic 
         // 1. Mark Current Level as Solved & Save Progress
         if let index = levels.firstIndex(where: { $0.id == id }) {

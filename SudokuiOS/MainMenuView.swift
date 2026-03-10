@@ -314,19 +314,25 @@ struct MainMenuView: View {
         let lastPlayedMode = UserDefaults.standard.string(forKey: "lastPlayedMode") ?? "standard"
         let sessionKey = (lastPlayedMode == "custom") ? "active_custom_session" : "active_standard_session"
         
-        if let data = UserDefaults.standard.data(forKey: sessionKey),
-           let session = try? JSONDecoder().decode(GameSession.self, from: data) {
-            self.activeSession = session
-        } else if lastPlayedMode == "custom" {
-            // Fallback for custom: check "active_standard_session" if custom session not found?
-            // Actually, better if we just try both as fallbacks.
-            if let data = UserDefaults.standard.data(forKey: "active_standard_session"),
-               let session = try? JSONDecoder().decode(GameSession.self, from: data) {
+        if lastPlayedMode == "custom" {
+            if let customLevel = customLevels.first(where: { $0.id.uuidString == lastCustomLevelUUID }),
+               customLevel.savedBoardProgress != nil {
+                // Return a "Skeleton" session to satisfy the UI, although we could also 
+                // refactor the UI to check both. For now, feeding a minimal session is safest.
+                self.activeSession = GameSession(
+                    levelID: -1, // Not used for custom
+                    isCustomLevel: true,
+                    customLevelId: lastCustomLevelUUID,
+                    userBoard: customLevel.savedBoardProgress,
+                    timeElapsed: customLevel.savedTime
+                )
+            } else if let data = UserDefaults.standard.data(forKey: "active_custom_session"),
+                      let session = try? JSONDecoder().decode(GameSession.self, from: data) {
                 self.activeSession = session
             }
         } else {
             // Standard fallback
-            if let data = UserDefaults.standard.data(forKey: "active_custom_session"),
+            if let data = UserDefaults.standard.data(forKey: "active_standard_session"),
                let session = try? JSONDecoder().decode(GameSession.self, from: data) {
                 self.activeSession = session
             } else if let data = UserDefaults.standard.data(forKey: "activeGameSession"), // FINAL LEGACY FALLBACK

@@ -530,8 +530,15 @@ class SudokuGameViewModel: ObservableObject {
         
         let sessionKey = isCustomLevel ? "active_custom_session" : "active_standard_session"
         
-        if let encoded = try? JSONEncoder().encode(session) {
-            UserDefaults.standard.set(encoded, forKey: sessionKey)
+        // --- NEW: For custom levels, we only need to store the POINTER (UUID) and Mode in UserDefaults ---
+        // The actual board data is now stored directly on CustomSudokuLevel in SwiftData.
+        if !isCustomLevel {
+            if let encoded = try? JSONEncoder().encode(session) {
+                UserDefaults.standard.set(encoded, forKey: sessionKey)
+            }
+        } else {
+            // Optional: clear the old heavy session data to save memory
+            UserDefaults.standard.removeObject(forKey: "active_custom_session")
         }
         
         // Track last played mode for "Continue" logic
@@ -580,7 +587,8 @@ class SudokuGameViewModel: ObservableObject {
         let killerMarkedCombinationsData = try? JSONEncoder().encode(markedKillerCombinations)
         let crossData = try? JSONEncoder().encode(crossesDict)
         
-        parentViewModel.saveLevelProgress(levelId: levelID, currentBoard: currentBoardString, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, killerMarkedCombinationsData: killerMarkedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
+        let customUUID = parentViewModel.levels.first(where: { $0.id == levelID })?.customUUID
+        parentViewModel.saveLevelProgress(levelId: levelID, customUUID: customUUID, currentBoard: currentBoardString, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, killerMarkedCombinationsData: killerMarkedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
         
         // Also update Active Game Session (UserDefaults) to ensure "Continue" routing is accurate
         saveGameSession()
@@ -1467,7 +1475,8 @@ class SudokuGameViewModel: ObservableObject {
         }
         
         let isPerfect = (mistakesCount == 0 && hintsUsed == 0)
-        parentViewModel.levelSolved(id: levelID, timeElapsed: timeElapsed, isPerfect: isPerfect, mistakesMade: mistakesCount)
+        let customUUID = parentViewModel.levels.first(where: { $0.id == levelID })?.customUUID
+        parentViewModel.levelSolved(id: levelID, customUUID: customUUID, timeElapsed: timeElapsed, isPerfect: isPerfect, mistakesMade: mistakesCount)
         
         // Clear Active Game Session
         UserDefaults.standard.removeObject(forKey: "activeGameSession")
