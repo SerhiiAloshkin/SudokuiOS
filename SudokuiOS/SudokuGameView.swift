@@ -10,14 +10,14 @@ struct SudokuGameView: View {
     var onNextLevel: (Int) -> Void = { _ in } // Callback for next level navigation, receives Target ID
     @ObservedObject var adCoordinator: AdCoordinator // Injected for Rewarded Ads
     
-    init(levelID: Int, viewModel: LevelViewModel, adCoordinator: AdCoordinator, session: GameSession? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
-        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(levelID: levelID, levelViewModel: viewModel, session: session))
+    init(levelID: Int, viewModel: LevelViewModel, adCoordinator: AdCoordinator, session: GameSession? = nil, title: String? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
+        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(levelID: levelID, levelViewModel: viewModel, session: session, title: title))
         self.adCoordinator = adCoordinator
         self.onNextLevel = onNextLevel
     }
     
-    init(level: SudokuLevel, viewModel: LevelViewModel, adCoordinator: AdCoordinator, session: GameSession? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
-        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(level: level, levelViewModel: viewModel, session: session))
+    init(level: SudokuLevel, viewModel: LevelViewModel, adCoordinator: AdCoordinator, session: GameSession? = nil, title: String? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
+        self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(level: level, levelViewModel: viewModel, session: session, title: title))
         self.adCoordinator = adCoordinator
         self.onNextLevel = onNextLevel
     }
@@ -700,9 +700,15 @@ struct SudokuGameView: View {
                 // Centered Metadata (Level + Type)
                 VStack(spacing: 4) {
                     HStack(alignment: .center, spacing: 8) {
-                        Text(gameViewModel.levelTitle)
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .foregroundColor(Color("ThemeBlue"))
+                        if gameViewModel.isCustomLevel {
+                            Text(gameViewModel.customLevelTitle ?? "Custom Level")
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                                .foregroundColor(Color("ThemeBlue"))
+                        } else {
+                            Text("Level \(gameViewModel.levelID)")
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                                .foregroundColor(Color("ThemeBlue"))
+                        }
                         
                         if gameViewModel.negativeConstraint {
                             Text("NEGATIVE")

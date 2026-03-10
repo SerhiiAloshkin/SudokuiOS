@@ -46,6 +46,7 @@ class SudokuGameViewModel: ObservableObject {
     @Published var isSolved: Bool = false
     @Published var isGameComplete: Bool = false 
     @Published var customLevelUUID: String? = nil
+    @Published var customLevelTitle: String? = nil
     
     // Multi-Select
     @Published var isMultiSelectMode: Bool = false
@@ -245,10 +246,11 @@ class SudokuGameViewModel: ObservableObject {
     
     var cellCrosses: [Int: Bool] = [:] // Temporary storage during init
     
-    init(levelID: Int, levelViewModel: LevelViewModel, session: GameSession? = nil) {
+    init(levelID: Int, levelViewModel: LevelViewModel, session: GameSession? = nil, title: String? = nil) {
         self.levelID = levelID
         self.parentViewModel = levelViewModel
-
+        self.customLevelTitle = title
+        
         loadLevelData(session: session)
         
         // Track Game Session for Persistence
@@ -258,9 +260,10 @@ class SudokuGameViewModel: ObservableObject {
         startHintCooldownTimer()
     }
     
-    init(level: SudokuLevel, levelViewModel: LevelViewModel, session: GameSession? = nil) {
+    init(level: SudokuLevel, levelViewModel: LevelViewModel, session: GameSession? = nil, title: String? = nil) {
         self.levelID = level.id
         self.parentViewModel = levelViewModel
+        self.customLevelTitle = title ?? level.customTitle
         
         self.setupLevel(level, session: session)
         
@@ -304,6 +307,7 @@ class SudokuGameViewModel: ObservableObject {
         self.isSolved = level.isSolved
         self.bestTime = level.bestTime
         self.customLevelUUID = level.customUUID
+        self.customLevelTitle = level.customTitle
         
         self.ruleType = level.ruleType
         // Hybrid Support: Use 'types' if available, otherwise fallback to single 'ruleType'
@@ -2305,8 +2309,8 @@ class SudokuGameViewModel: ObservableObject {
     
     // MARK: - Header Info
     var levelTitle: String {
-        if let level = parentViewModel.levels.first(where: { $0.id == levelID }), let custom = level.customTitle {
-            return custom
+        if isCustomLevel {
+            return customLevelTitle ?? "Custom Level"
         }
         return "Level \(levelID)"
     }

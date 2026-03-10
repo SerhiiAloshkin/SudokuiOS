@@ -23,7 +23,8 @@ struct CustomGameWrapperView: View {
                     level: level,
                     viewModel: viewModel,
                     adCoordinator: adCoordinator,
-                    session: session
+                    session: session,
+                    title: customLevel.levelName
                 )
             } else {
                 ProgressView("Loading level...")
