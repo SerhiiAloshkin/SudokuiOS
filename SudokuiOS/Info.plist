@@ -4,8 +4,6 @@
 <dict>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3940256099942544~1458002511</string>
-	<key>NSMotionUsageDescription</key>
-	<string>Interactive ad features may use device motion.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

@@ -300,8 +300,10 @@ struct SudokuGameView: View {
                         Text("\(cell.value)")
                             .font(.system(size: cellSize * 0.7, weight: isError ? .bold : .medium, design: .rounded))
                             .foregroundColor(cell.isClue ? .primary : (isError ? .red : Color("PlayerNumberColor")))
+                            .drawingGroup() // Force sharp rendering
                     } else if !cell.notes.isEmpty {
                         noteGrid
+                            .drawingGroup() // Force sharp rendering for notes
                     }
                 } else if drawLayer == .cross {
                     // 3.5 Cross Overlay
@@ -930,7 +932,13 @@ struct SudokuGameView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
         
         // Grid Config
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 9)
+        var columns: [GridItem] {
+            // Use fixed width to avoid fractional sub-pixel stretching
+            // This will be updated dynamically in the body if needed, 
+            // but for LazyVGrid we must be careful.
+            // Actually, we can just use flexible and ensure the board width is rounded.
+            Array(repeating: GridItem(.flexible(), spacing: 0), count: 9)
+        }
         
         // Gesture State
         @State private var isDragging = false
@@ -1103,6 +1111,7 @@ struct SudokuGameView: View {
                                 }
                             }
                             .id("\(gameViewModel.boardID)-content")
+                            .drawingGroup() // Flatten content layer for pixel-perfect alignment
                             .zIndex(4)
                         }
                         .clipped()
