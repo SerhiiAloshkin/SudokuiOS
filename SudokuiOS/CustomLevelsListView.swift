@@ -89,18 +89,11 @@ struct CustomLevelsListView: View {
                     .font(.headline)
                 
                 HStack(spacing: 6) {
-                    // Unified Rule Badges (Deduplicated)
+                    // Unified Rule Badges (Deduplicated with ViewThatFits)
                     let rules = level.toSudokuLevel().types
                     let displayRules = rules.count > 1 ? rules.filter { $0 != .classic } : rules
                     
-                    ForEach(displayRules, id: \.self) { rule in
-                        Text(rule.shortName)
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(tagColor(for: rule).opacity(0.15))
-                            .cornerRadius(4)
-                    }
+                    RulesListView(rules: displayRules)
                 }
                 
                 Text(level.createdAt, style: .date)
@@ -117,21 +110,6 @@ struct CustomLevelsListView: View {
             
         }
         .padding(.vertical, 4)
-    }
-    
-    private func tagColor(for rule: SudokuRuleType) -> Color {
-        switch rule {
-        case .classic: return .blue
-        case .nonConsecutive: return .orange
-        case .king: return .purple
-        case .knight: return .green
-        case .thermo: return .gray
-        case .arrow: return .blue
-        case .killer: return .red
-        case .kropki: return .primary
-        case .sandwich: return .yellow
-        case .oddEven: return .cyan
-        }
     }
     
 }

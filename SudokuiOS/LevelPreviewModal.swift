@@ -19,22 +19,9 @@ struct LevelPreviewModal: View {
                         .fontWeight(.bold)
                         .foregroundColor(Color("ThemeBlue"))
                     
-                    // Variant Label with Icon
-                    HStack {
-                        if level.ruleType == .knight {
-                           Image("knight_icon")
-                               .resizable()
-                               .renderingMode(.template) 
-                               .scaledToFit()
-                               .frame(width: 16, height: 16)
-                        } else if !LevelSelectionView.isSystemIcon(level.ruleType.iconName) {
-                            // Assuming SF Symbol if part of enum, logic copied from Card View mostly
-                            Image(systemName: level.ruleType.iconName)
-                        }
-                        Text(level.ruleType.displayName)
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                    }
+                    // Variant Label(s) with Icons (ViewThatFits)
+                    let rules = level.types.isEmpty ? [level.ruleType] : level.types
+                    RulesListView(rules: rules)
                 }
                 .padding(.top, 20)
                 
