@@ -7,6 +7,8 @@ struct MainMenuView: View {
     @Environment(AppSettings.self) var settings
     @AppStorage("lastUnfinishedLevelID") private var lastUnfinishedLevelID: Int = -1
     @AppStorage("lastPlayedTimestamp") private var lastPlayedTimestamp: Double = 0.0
+    @AppStorage("lastCustomLevelUUID") private var lastCustomLevelUUID: String = ""
+    @Query private var customLevels: [CustomSudokuLevel]
     @State private var showSettings = false
     @State private var navigationPath: [SudokuRoute] = []
     @StateObject private var adCoordinator = AdCoordinator() // Manage Ads Globally/at Menu Level
@@ -94,7 +96,27 @@ struct MainMenuView: View {
                         if showButtons {
                             VStack(spacing: 20) {
                                 // 1. Continue Level (Dynamic Card)
-                                if lastUnfinishedLevelID != -1, let level = viewModel.levels.first(where: { $0.id == lastUnfinishedLevelID }) {
+                                if lastUnfinishedLevelID != -1 {
+                                    // Determine if it's a custom level or standard level
+                                    let isCustom = lastUnfinishedLevelID < 0
+                                    let customLevel = isCustom ? customLevels.first(where: { $0.id.uuidString == lastCustomLevelUUID }) : nil
+                                    let standardLevel = !isCustom ? viewModel.levels.first(where: { $0.id == lastUnfinishedLevelID }) : nil
+                                    
+                                    if isCustom, let cl = customLevel {
+                                        // Custom level Continue
+                                        Button(action: {
+                                            navigationPath = [.customLevels, .customGame(cl)]
+                                        }) {
+                                            continueCardContent(
+                                                title: cl.levelName,
+                                                iconName: cl.ruleType.iconName,
+                                                ruleName: cl.ruleType.shortName,
+                                                timeElapsed: 0
+                                            )
+                                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                                        }
+                                        .buttonStyle(.plain)
+                                    } else if let level = standardLevel {
                                      Button(action: {
                                          navigationPath = [.levelSelection, .game(lastUnfinishedLevelID)]
                                      }) {
@@ -268,6 +290,54 @@ struct MainMenuView: View {
         let m = seconds / 60
         let s = seconds % 60
         return String(format: "%02d:%02d", m, s)
+    }
+    
+    private func continueCardContent(title: String, iconName: String, ruleName: String, timeElapsed: Int) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("CONTINUE")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white.opacity(0.8))
+                    .tracking(1)
+                
+                Text(title)
+                    .font(.title)
+                    .fontWeight(.black)
+                    .foregroundColor(.white)
+                
+                HStack(spacing: 6) {
+                    Image(systemName: iconName)
+                        .font(.caption)
+                    Text(ruleName)
+                        .font(.caption)
+                    
+                    if timeElapsed > 0 {
+                        Text("•")
+                        Text(formatTime(seconds: timeElapsed))
+                            .font(.caption)
+                            .monospacedDigit()
+                    }
+                }
+                .foregroundColor(.white.opacity(0.9))
+            }
+            
+            Spacer()
+            
+            Image(systemName: "play.circle.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.white)
+        }
+        .padding()
+        .background(
+            ZStack {
+                Color.themeBlue
+                LevelGridPattern()
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            }
+        )
+        .cornerRadius(16)
+        .shadow(color: Color.themeBlue.opacity(0.3), radius: 8, x: 0, y: 4)
     }
 }
 

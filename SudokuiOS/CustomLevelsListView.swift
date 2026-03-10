@@ -40,9 +40,27 @@ struct CustomLevelsListView: View {
             } else {
                 List {
                     ForEach(levels) { level in
-                        customLevelRow(level)
+                        Button(action: {
+                            navigationStack.append(.customGame(level))
+                        }) {
+                            customLevelRow(level)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                modelContext.delete(level)
+                                try? modelContext.save()
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            Button {
+                                navigationStack.append(.levelBuilderEdit(level))
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(.blue)
+                        }
                     }
-                    .onDelete(perform: deleteLevels)
                 }
                 .listStyle(.plain)
             }
@@ -106,27 +124,8 @@ struct CustomLevelsListView: View {
                     .foregroundColor(.green)
             }
             
-            // Edit button
-            Button(action: {
-                navigationStack.append(.levelBuilderEdit(level))
-            }) {
-                Image(systemName: "pencil.circle")
-                    .font(.title2)
-                    .foregroundColor(.blue)
-            }
-            .buttonStyle(.plain)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            navigationStack.append(.customGame(level))
         }
         .padding(.vertical, 4)
     }
     
-    private func deleteLevels(at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(levels[index])
-        }
-        try? modelContext.save()
-    }
 }

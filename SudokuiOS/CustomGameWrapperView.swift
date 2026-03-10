@@ -30,6 +30,8 @@ struct CustomGameWrapperView: View {
             let sudokuLevel = customLevel.toSudokuLevel()
             viewModel.injectCustomLevel(sudokuLevel)
             levelID = sudokuLevel.id
+            // Store UUID for Continue button on app restart
+            UserDefaults.standard.set(customLevel.id.uuidString, forKey: "lastCustomLevelUUID")
         }
     }
 }
