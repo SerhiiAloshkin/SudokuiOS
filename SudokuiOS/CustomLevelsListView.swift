@@ -43,23 +43,36 @@ struct CustomLevelsListView: View {
                         Button(action: {
                             navigationStack.append(.customGame(level))
                         }) {
-                            customLevelRow(level)
+                            ZStack(alignment: .topTrailing) {
+                                customLevelRow(level)
+                                
+                                Menu {
+                                    Button {
+                                        navigationStack.append(.levelBuilderEdit(level))
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    
+                                    Button(role: .destructive) {
+                                        modelContext.delete(level)
+                                        try? modelContext.save()
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(.secondary)
+                                        .padding(10)
+                                        .contentShape(Rectangle())
+                                }
+                                .padding(.top, 4)
+                                .padding(.trailing, -4)
+                            }
                         }
                         .buttonStyle(.plain)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                modelContext.delete(level)
-                                try? modelContext.save()
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            Button {
-                                navigationStack.append(.levelBuilderEdit(level))
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            .tint(.blue)
-                        }
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                     }
                 }
                 .listStyle(.plain)

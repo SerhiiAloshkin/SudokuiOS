@@ -264,51 +264,7 @@ class SudokuGameViewModel: ObservableObject {
             parentViewModel.loadLevelsFromJSON()
         }
         
-        let isCustom = levelID >= 9000
-        
-        if isCustom {
-            let customIndex = levelID - 9000
-            guard customIndex >= 0 && customIndex < parentViewModel.customLevels.count else {
-                loadEmptyBoard()
-                return
-            }
-            let customLevel = parentViewModel.customLevels[customIndex]
-            
-            // 1. Set Static Data (Clues & Solution)
-            self.initialBoard = customLevel.board
-            self.solution = customLevel.solution ?? ""
-            self.initialBoardArray = Self.parseBoardString(self.initialBoard)
-            self.solutionArray = Self.parseBoardString(self.solution)
-            self.isSolved = customLevel.isSolved
-            self.bestTime = customLevel.bestTime
-            self.ruleType = customLevel.ruleType
-            self.rules = [customLevel.ruleType]
-            self.negativeConstraint = false // Assuming classic/custom default
-            self.parityOverlay = nil
-            
-            // Decodes
-            if let tData = customLevel.thermoPathsData { self.thermoPaths = try? JSONDecoder().decode([[[Int]]].self, from: tData) }
-            if let aData = customLevel.arrowsData { self.arrows = try? JSONDecoder().decode([SudokuLevel.Arrow].self, from: aData) }
-            if let cData = customLevel.cagesData { self.cages = try? JSONDecoder().decode([SudokuLevel.Cage].self, from: cData) }
-            if let wData = customLevel.whiteDotsData { self.whiteDots = try? JSONDecoder().decode([SudokuLevel.KropkiDot].self, from: wData) }
-            if let bData = customLevel.blackDotsData { self.blackDots = try? JSONDecoder().decode([SudokuLevel.KropkiDot].self, from: bData) }
-            if let rData = customLevel.sandwichRowCluesData { self.rowClues = try? JSONDecoder().decode([Int].self, from: rData) }
-            if let cData = customLevel.sandwichColCluesData { self.colClues = try? JSONDecoder().decode([Int].self, from: cData) }
-            
-            // Current State (Customs don't have transient saves yet in this iteration)
-            self.currentBoard = self.initialBoard
-            self.timeElapsed = 0
-            self.mistakesCount = 0
-            self.hintsUsed = 0
-            self.isGameOver = false
-            self.hintCooldownRemaining = 0
-            self.hintCooldownTimer?.invalidate()
-            
-            finishLoadingBoardSetup()
-            return
-        }
-        
-        // Standard Bundled Levels
+        // Find the level (Standard or Injected Custom)
         guard let level = parentViewModel.levels.first(where: { $0.id == levelID }) else {
             loadEmptyBoard()
             return
@@ -401,8 +357,8 @@ class SudokuGameViewModel: ObservableObject {
              }
         }
         
-        // 5. Load Persistent Object for History (Only for standard levels currently)
-        if !isCustom, let level = parentViewModel.levels.first(where: { $0.id == levelID }) {
+        // 5. Load Persistent Object for History
+        if let level = parentViewModel.levels.first(where: { $0.id == levelID }) {
             if let progress = parentViewModel.getProgress(for: levelID) {
                 self.levelProgress = progress
                 if let moves = progress.moves, !moves.isEmpty {

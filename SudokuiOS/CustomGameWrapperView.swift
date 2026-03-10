@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// Wrapper that converts a CustomSudokuLevel into a standard SudokuLevel
 /// and injects it into LevelViewModel so SudokuGameView can play it.
@@ -9,6 +10,7 @@ struct CustomGameWrapperView: View {
     let customLevel: CustomSudokuLevel
     @ObservedObject var viewModel: LevelViewModel
     @ObservedObject var adCoordinator: AdCoordinator
+    @Environment(\.modelContext) private var modelContext
     @Binding var navigationStack: [MainMenuView.SudokuRoute]
     
     @State private var levelID: Int? = nil
@@ -27,7 +29,27 @@ struct CustomGameWrapperView: View {
         }
         .onAppear {
             guard levelID == nil else { return }
-            let sudokuLevel = customLevel.toSudokuLevel()
+            var sudokuLevel = customLevel.toSudokuLevel()
+            
+            // Hydrate progress from SwiftData
+            let id = sudokuLevel.id
+            let descriptor = FetchDescriptor<UserLevelProgress>(predicate: #Predicate<UserLevelProgress> { progress in
+                progress.levelID == id
+            })
+            if let progress = try? modelContext.fetch(descriptor).first {
+                sudokuLevel.userProgress = progress.currentUserBoard
+                sudokuLevel.notesData = progress.notesData
+                sudokuLevel.colorData = progress.colorData
+                sudokuLevel.markedCombinationsData = progress.markedCombinationsData
+                sudokuLevel.killerMarkedCombinationsData = progress.killerMarkedCombinationsData
+                sudokuLevel.crossData = progress.crossData
+                sudokuLevel.timeElapsed = progress.timeElapsed
+                sudokuLevel.bestTime = progress.bestTime
+                sudokuLevel.isSolved = progress.isSolved
+                sudokuLevel.isPerfect = progress.isPerfect
+                sudokuLevel.mistakesMade = progress.mistakesMade
+            }
+            
             viewModel.injectCustomLevel(sudokuLevel)
             levelID = sudokuLevel.id
             // Store UUID for Continue button on app restart
