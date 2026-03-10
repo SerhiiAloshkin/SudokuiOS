@@ -448,7 +448,7 @@ struct SudokuGameView: View {
                             .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundColor(Color("ThemeBlue"))
                         
-                        Text("Level \(gameViewModel.levelID) • \(gameViewModel.ruleType?.displayName ?? "Sudoku")")
+                        Text("\(gameViewModel.levelTitle) • \(gameViewModel.ruleType?.displayName ?? "Sudoku")")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }

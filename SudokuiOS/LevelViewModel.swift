@@ -4,6 +4,8 @@ import SwiftData
 
 struct SudokuLevel: Identifiable, Codable, Equatable {
     let id: Int
+    var customTitle: String?
+    var customUUID: String?
     var isLocked: Bool
     var isAdUnlocked: Bool = false // Runtime state from persistence
     var isUnlocked: Bool = false // Sticky state
@@ -105,7 +107,7 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
     var mistakesMade: Int = 0
     
     enum CodingKeys: String, CodingKey {
-        case id, board, clues, solution, difficulty, ruleType, variant, types, rowClues, colClues, sandwich_clues, thermoPaths, arrows, cages, white_dots, black_dots, negative_constraint, parity
+        case id, customTitle, customUUID, board, clues, solution, difficulty, ruleType, variant, types, rowClues, colClues, sandwich_clues, thermoPaths, arrows, cages, white_dots, black_dots, negative_constraint, parity
     }
     
     // Nested struct for decoding
@@ -114,8 +116,10 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
         let col_sums: [Int]
     }
     
-    init(id: Int, isLocked: Bool, isSolved: Bool, board: String? = nil, solution: String? = nil, difficulty: String? = nil, ruleType: SudokuRuleType = .classic) {
+    init(id: Int, customTitle: String? = nil, customUUID: String? = nil, isLocked: Bool, isSolved: Bool, board: String? = nil, solution: String? = nil, difficulty: String? = nil, ruleType: SudokuRuleType = .classic) {
         self.id = id
+        self.customTitle = customTitle
+        self.customUUID = customUUID
         self.isLocked = isLocked
         self.isSolved = isSolved
         self.board = board
@@ -128,6 +132,8 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(Int.self, forKey: .id)
+        customTitle = try container.decodeIfPresent(String.self, forKey: .customTitle)
+        customUUID = try container.decodeIfPresent(String.self, forKey: .customUUID)
         
         // Unified Parsing: Use 'board' OR 'clues' (if string) as source of initial board
         if let boardStr = try container.decodeIfPresent(String.self, forKey: .board) {

@@ -170,17 +170,6 @@ final class CustomSudokuLevel: Identifiable {
             typesArray.append(.sandwich)
         }
         
-        // Ensure global rules are present if toggled
-        if isNonConsecutive && !typesArray.contains(.nonConsecutive) {
-            typesArray.append(.nonConsecutive)
-        }
-        if isKing && !typesArray.contains(.king) {
-            typesArray.append(.king)
-        }
-        if isKnight && !typesArray.contains(.knight) {
-            typesArray.append(.knight)
-        }
-        
         // De-duplicate types array
         typesArray = Array(Set(typesArray)).sorted(by: { $0.rawValue < $1.rawValue }) // Set for uniqueness, sort for stability
         
@@ -189,6 +178,8 @@ final class CustomSudokuLevel: Identifiable {
         
         var level = SudokuLevel(
             id: uniqueID,
+            customTitle: levelName,
+            customUUID: self.id.uuidString,
             isLocked: false,
             isSolved: isSolved,
             board: board,

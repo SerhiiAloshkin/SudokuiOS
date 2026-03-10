@@ -74,6 +74,10 @@ class LevelBuilderViewModel: ObservableObject {
     @Published var showInvalidTapFeedback: Bool = false
     @Published var showCageSumPrompt: Bool = false
     @Published var pendingCageSum: String = ""
+    var isPendingCageSumValid: Bool {
+        guard let sum = Int(pendingCageSum) else { return false }
+        return sum >= 1 && sum <= 45
+    }
     
     // MARK: - Kropki Placement State (Req 4)
     @Published var kropkiFirstCell: Int? = nil
@@ -239,11 +243,11 @@ class LevelBuilderViewModel: ObservableObject {
     
     /// Called after user enters cage sum in the alert
     func commitCageWithSum() {
-        let sum = Int(pendingCageSum) ?? 0
-        guard sum > 0, currentShapePath.count > 1 else {
+        guard isPendingCageSumValid, currentShapePath.count > 1 else {
             currentShapePath.removeAll()
             return
         }
+        let sum = Int(pendingCageSum)!
         let cellsCoords = currentShapePath.map { [$0 / 9, $0 % 9] }
         let cage = SudokuLevel.Cage(sum: sum, cells: cellsCoords)
         cages.append(cage)
@@ -298,6 +302,8 @@ class LevelBuilderViewModel: ObservableObject {
             return isNonConsecutive ? 5 : 9
         case .arrow:
             return 10 // 1 head + max 9 body cells (sum ≤ 9)
+        case .cage:
+            return 9 // Mathematical rule: digits 1-9 cannot repeat, max 9 cells
         default:
             return 81
         }
@@ -358,8 +364,13 @@ class LevelBuilderViewModel: ObservableObject {
         // Commit any in-progress shape before saving
         if isShapeInProgress { finishCurrentShape() }
         
-        // Show name prompt
-        pendingLevelName = ""
+        // Pre-fill default name if not already set (e.g. not editing or empty)
+        if pendingLevelName.trimmingCharacters(in: .whitespaces).isEmpty {
+            let descriptor = FetchDescriptor<CustomSudokuLevel>()
+            let existingCount = (try? context.fetchCount(descriptor)) ?? 0
+            pendingLevelName = "Level \(existingCount + 1)"
+        }
+        
         showSaveNamePrompt = true
         // Actual save happens in commitSave(context:)
     }

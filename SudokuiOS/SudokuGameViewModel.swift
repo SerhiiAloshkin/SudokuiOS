@@ -250,9 +250,8 @@ class SudokuGameViewModel: ObservableObject {
 
         loadLevelData()
         
-        // Track Last Unfinished Level
-        UserDefaults.standard.set(levelID, forKey: "lastUnfinishedLevelID")
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastPlayedTimestamp")
+        // Track Game Session for Persistence
+        saveGameSession()
         
         // Resume any active hint cooldown
         startHintCooldownTimer()
@@ -469,6 +468,27 @@ class SudokuGameViewModel: ObservableObject {
                 self.saveState()
             }
         }
+    }
+    
+    func saveGameSession() {
+        guard let level = parentViewModel.levels.first(where: { $0.id == levelID }) else { return }
+        
+        let session = GameSession(
+            levelID: levelID,
+            isCustomLevel: isCustomLevel,
+            customLevelId: level.customUUID
+        )
+        
+        if let encoded = try? JSONEncoder().encode(session) {
+            UserDefaults.standard.set(encoded, forKey: "activeGameSession")
+        }
+        
+        // Legacy Cleanup
+        UserDefaults.standard.set(levelID, forKey: "lastUnfinishedLevelID")
+        UserDefaults.standard.set(session.timestamp, forKey: "lastPlayedTimestamp")
+         if let uuid = level.customUUID {
+             UserDefaults.standard.set(uuid, forKey: "lastCustomLevelUUID")
+         }
     }
     
     func saveState() {
@@ -1392,8 +1412,9 @@ class SudokuGameViewModel: ObservableObject {
         let isPerfect = (mistakesCount == 0 && hintsUsed == 0)
         parentViewModel.levelSolved(id: levelID, timeElapsed: timeElapsed, isPerfect: isPerfect, mistakesMade: mistakesCount)
         
-        // Clear Last Unfinished Level
-        UserDefaults.standard.set(-1, forKey: "lastUnfinishedLevelID")
+        // Clear Active Game Session
+        UserDefaults.standard.removeObject(forKey: "activeGameSession")
+        UserDefaults.standard.set(-1, forKey: "lastUnfinishedLevelID") // Legacy Cleanup
         
         // 4. Persistence
         saveState()
@@ -2218,7 +2239,10 @@ class SudokuGameViewModel: ObservableObject {
     
     // MARK: - Header Info
     var levelTitle: String {
-        "Level \(levelID)"
+        if let level = parentViewModel.levels.first(where: { $0.id == levelID }), let custom = level.customTitle {
+            return custom
+        }
+        return "Level \(levelID)"
     }
     
     func getRawRuleType() -> String {
