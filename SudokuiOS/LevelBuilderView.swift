@@ -59,6 +59,15 @@ struct LevelBuilderView: View {
         } message: {
             Text("Enter a name, or leave blank for an auto-generated name.")
         }
+        .alert("Sandwich Clue", isPresented: $viewModel.showSandwichAlert) {
+            TextField("Sum (0 or 2-35)", text: $viewModel.sandwichInputValue)
+                .keyboardType(.numberPad)
+            Button("Save") { viewModel.commitSandwichClue() }
+                .disabled(!viewModel.isSandwichInputValid)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Enter the sum of digits between 1 and 9 for this \(viewModel.isRowSandwich ? "row" : "column").\nValid values: 0 (adjacent) or 2-35.")
+        }
     }
     
     // MARK: - Header
@@ -132,6 +141,9 @@ struct LevelBuilderView: View {
                 }
                 BuilderToolButton(icon: "circle.fill", label: "B. Dot", isSelected: viewModel.selectedTool == .blackDot) {
                     viewModel.selectedTool = .blackDot
+                }
+                BuilderToolButton(icon: "square.stack.3d.up", label: "Sandwich", isSelected: viewModel.selectedTool == .sandwich) {
+                    viewModel.selectedTool = .sandwich
                 }
                 // Placeholder to ensure the last item can be fully seen even with the mask
                 Spacer().frame(width: 20)
@@ -224,7 +236,56 @@ struct LevelBuilderView: View {
                 }
             }
             .frame(width: availableWidth, height: availableWidth)
+            .overlay(sandwichCluesOverlay(cellSize: cellSize))
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
+        }
+    }
+    
+    @ViewBuilder
+    private func sandwichCluesOverlay(cellSize: CGFloat) -> some View {
+        let isSandwichTool = viewModel.selectedTool == .sandwich
+        
+        ZStack {
+            // Column Clues (Top)
+            HStack(spacing: 0) {
+                ForEach(0..<9, id: \.self) { i in
+                    sandwichClueButton(index: i, isRow: false, cellSize: cellSize)
+                }
+            }
+            .offset(y: -(cellSize + 8))
+            
+            // Row Clues (Left)
+            VStack(spacing: 0) {
+                ForEach(0..<9, id: \.self) { i in
+                    sandwichClueButton(index: i, isRow: true, cellSize: cellSize)
+                }
+            }
+            .offset(x: -(cellSize + 8))
+        }
+    }
+    
+    @ViewBuilder
+    private func sandwichClueButton(index: Int, isRow: Bool, cellSize: CGFloat) -> some View {
+        let clue = isRow ? viewModel.sandwichRowClues[index] : viewModel.sandwichColClues[index]
+        let isEraser = viewModel.selectedTool == .erase
+        let isSandwichTool = viewModel.selectedTool == .sandwich
+        let hasClue = clue != nil
+        
+        if isSandwichTool || hasClue || (isEraser && hasClue) {
+            Button(action: { viewModel.handleSandwichTap(index: index, isRow: isRow) }) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(hasClue ? Color.blue.opacity(0.1) : Color.gray.opacity(0.05))
+                        .frame(width: cellSize * 0.8, height: cellSize * 0.8)
+                    
+                    Text(hasClue ? "\(clue!)" : "-")
+                        .font(.system(size: cellSize * 0.4, weight: .bold, design: .rounded))
+                        .foregroundColor(hasClue ? .blue : .secondary.opacity(0.5))
+                }
+            }
+            .frame(width: cellSize, height: cellSize)
+        } else {
+            Color.clear.frame(width: cellSize, height: cellSize)
         }
     }
     

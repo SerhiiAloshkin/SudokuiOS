@@ -68,6 +68,20 @@ class LevelBuilderViewModel: ObservableObject {
     @Published var whiteDots: [SudokuLevel.KropkiDot] = []
     @Published var blackDots: [SudokuLevel.KropkiDot] = []
     
+    // MARK: - Sandwich Clues
+    @Published var sandwichRowClues: [Int: Int] = [:]
+    @Published var sandwichColClues: [Int: Int] = [:]
+    
+    @Published var showSandwichAlert: Bool = false
+    @Published var selectedSandwichIndex: Int = 0
+    @Published var isRowSandwich: Bool = true
+    @Published var sandwichInputValue: String = ""
+    
+    var isSandwichInputValid: Bool {
+        guard let val = Int(sandwichInputValue) else { return false }
+        return val == 0 || (val >= 2 && val <= 35)
+    }
+    
     // MARK: - Sequential Tap Drawing State
     @Published var currentShapePath: [Int] = []
     var isShapeInProgress: Bool { !currentShapePath.isEmpty }
@@ -98,6 +112,7 @@ class LevelBuilderViewModel: ObservableObject {
         case whiteDot
         case blackDot
         case oddEven(String)
+        case sandwich
     }
     
     // MARK: - Init
@@ -152,6 +167,14 @@ class LevelBuilderViewModel: ObservableObject {
         }
         if let data = level.blackDotsData {
             blackDots = (try? JSONDecoder().decode([SudokuLevel.KropkiDot].self, from: data)) ?? []
+        }
+        
+        // Decode Sandwich Data
+        if let data = level.sandwichRowCluesData, let array = try? JSONDecoder().decode([Int].self, from: data) {
+            for (i, val) in array.enumerated() where val >= 0 { sandwichRowClues[i] = val }
+        }
+        if let data = level.sandwichColCluesData, let array = try? JSONDecoder().decode([Int].self, from: data) {
+            for (i, val) in array.enumerated() where val >= 0 { sandwichColClues[i] = val }
         }
     }
     
@@ -209,7 +232,37 @@ class LevelBuilderViewModel: ObservableObject {
             handleShapeTap(cellId)
         case .whiteDot, .blackDot:
             handleKropkiTap(cellId)
+        case .sandwich:
+            // Tapping a cell with sandwich tool doesn't do much,
+            // but we could use it to toggle focus if we wanted.
+            // For now, sandwich clues are tapped OUTSIDE the grid.
+            break
         }
+    }
+    
+    func handleSandwichTap(index: Int, isRow: Bool) {
+        if selectedTool == .erase {
+            if isRow { sandwichRowClues.removeValue(forKey: index) }
+            else { sandwichColClues.removeValue(forKey: index) }
+            objectWillChange.send()
+        } else {
+            selectedSandwichIndex = index
+            isRowSandwich = isRow
+            sandwichInputValue = String(isRow ? (sandwichRowClues[index] ?? 0) : (sandwichColClues[index] ?? 0))
+            if sandwichInputValue == "0" { sandwichInputValue = "" }
+            showSandwichAlert = true
+        }
+    }
+    
+    func commitSandwichClue() {
+        guard isSandwichInputValid else { return }
+        let val = Int(sandwichInputValue) ?? 0
+        if isRowSandwich {
+            sandwichRowClues[selectedSandwichIndex] = val
+        } else {
+            sandwichColClues[selectedSandwichIndex] = val
+        }
+        objectWillChange.send()
     }
     
     // MARK: - Sequential Tap Drawing (Req 1)
@@ -360,6 +413,8 @@ class LevelBuilderViewModel: ObservableObject {
             rule = .king
         } else if isKnight {
             rule = .knight
+        } else if !sandwichRowClues.isEmpty || !sandwichColClues.isEmpty {
+            rule = .sandwich
         } else {
             rule = .classic
         }
@@ -383,7 +438,17 @@ class LevelBuilderViewModel: ObservableObject {
             arrowsData: try? JSONEncoder().encode(arrows),
             cagesData: try? JSONEncoder().encode(cages),
             whiteDotsData: try? JSONEncoder().encode(whiteDots),
-            blackDotsData: try? JSONEncoder().encode(blackDots)
+            blackDotsData: try? JSONEncoder().encode(blackDots),
+            sandwichRowCluesData: {
+                var array = Array(repeating: -1, count: 9)
+                for (i, val) in sandwichRowClues { array[i] = val }
+                return try? JSONEncoder().encode(array)
+            }(),
+            sandwichColCluesData: {
+                var array = Array(repeating: -1, count: 9)
+                for (i, val) in sandwichColClues { array[i] = val }
+                return try? JSONEncoder().encode(array)
+            }()
         )
         level.parityData = parityData
         return level
