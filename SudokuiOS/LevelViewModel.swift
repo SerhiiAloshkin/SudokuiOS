@@ -227,7 +227,7 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
 class LevelViewModel: ObservableObject {
     @Published var levels: [SudokuLevel] = []
     @Published var customLevels: [CustomSudokuLevel] = []
-    @Published var isLoading: Bool = true
+    private var hasLoadedLevels = false
  // New array for Custom Levels
     
     
@@ -249,14 +249,16 @@ class LevelViewModel: ObservableObject {
     }
     
     var isMilestoneOneComplete: Bool {
+        ensureLevelsLoaded()
         // Check if levels 1-250 are ALL solved
+        guard !levels.isEmpty else { return false }
         let endOfFirstSection = min(250, levels.count)
         return levels[0..<endOfFirstSection].allSatisfy { $0.isSolved }
     }
     
     var firstUnsolvedLevelID: Int {
+        ensureLevelsLoaded()
         // Find first level where isSolved is false
-        // Since array is sorted 1..600, first match is correct.
         return levels.first(where: { !$0.isSolved })?.id ?? 1
     }
     
@@ -278,32 +280,41 @@ class LevelViewModel: ObservableObject {
     
     init(modelContext: ModelContext? = nil) {
         self.modelContext = modelContext
-        
-        // 1. Generate default 600 empty structures (Runtime state)
-        // This remains synchronous and fast
-        var tempLevels: [SudokuLevel] = []
-        for i in 1...600 {
-            let item = SudokuLevel(id: i, isLocked: false, isSolved: false)
-            tempLevels.append(item)
-        }
-        self.levels = tempLevels
-        
-        // 2. Load heavy data asynchronously
-        Task {
-            await loadLevelsAsync()
-        }
+        // Instant init: Levels are loaded lazily on first access/onAppear
     }
     
-    private func loadLevelsAsync() async {
-        // Overlay Persistent JSON Data (Static) - Moved to background
-        await loadLevelsFromJSON()
+    /// Ensures levels are loaded from JSON exactly once.
+    func ensureLevelsLoaded() {
+        guard !hasLoadedLevels else { return }
+        self.levels = LevelViewModel.loadBundledLevels()
+        self.hasLoadedLevels = true
         
-        // Overlay SwiftData Progress (Dynamic)
+        // Apply persistent state immediately after parsing
         if modelContext != nil {
             loadProgressFromSwiftData()
         }
+        loadUnlockedLevelsFromUserDefaults()
+    }
+    
+    private static func loadBundledLevels() -> [SudokuLevel] {
+        var bundle: Bundle = .main
+        #if SWIFT_PACKAGE
+        bundle = Bundle.module
+        #endif
         
-        self.isLoading = false
+        guard let url = bundle.url(forResource: "Levels", withExtension: "json") else {
+            print("CRITICAL: Levels.json not found in bundle.")
+            return []
+        }
+        
+        do {
+            let data = try Data(contentsOf: url)
+            let decoded = try JSONDecoder().decode([SudokuLevel].self, from: data)
+            return decoded
+        } catch {
+            print("CRITICAL: Failed to parse Levels.json: \(error)")
+            return []
+        }
     }
     
     func updateContext(_ context: ModelContext) {
@@ -312,53 +323,12 @@ class LevelViewModel: ObservableObject {
         loadUnlockedLevelsFromUserDefaults() // Ensure UD unlocks are applied
     }
     
-    func loadLevelsFromJSON() async {
-        // Try to find the bundle containing the resource
-        var bundle: Bundle = .main
-        #if SWIFT_PACKAGE
-        bundle = Bundle.module
-        #endif
-        
-        guard let url = bundle.url(forResource: "Levels", withExtension: "json") else {
-            // Fallback
-            if bundle != .main, let mainUrl = Bundle.main.url(forResource: "Levels", withExtension: "json") {
-                 do { try await loadData(from: mainUrl) } catch { print("Fallback load failed: \(error)") }
-                 return
-            }
-            print("Levels.json not found in bundle")
-            return
-        }
-        
-        do { try await loadData(from: url) } catch { print("Failed to load levels: \(error)") }
-    }
-    
-    private func loadData(from url: URL) async throws {
-        // Offload reading and decoding to a background thread
-        let loadedLevels = try await Task.detached(priority: .userInitiated) {
-            let data = try Data(contentsOf: url)
-            let decoder = JSONDecoder()
-            return try decoder.decode([SudokuLevel].self, from: data)
-        }.value
-        
-        // Back on @MainActor (inherent from class), apply to levels
-        for loadedLevel in loadedLevels {
-            if let index = levels.firstIndex(where: { $0.id == loadedLevel.id }) {
-                levels[index].board = loadedLevel.board
-                levels[index].solution = loadedLevel.solution
-                levels[index].difficulty = loadedLevel.difficulty
-                levels[index].ruleType = loadedLevel.ruleType
-                levels[index].types = loadedLevel.types
-                levels[index].rowClues = loadedLevel.rowClues
-                levels[index].colClues = loadedLevel.colClues
-                levels[index].thermoPaths = loadedLevel.thermoPaths
-                levels[index].arrows = loadedLevel.arrows
-                levels[index].cages = loadedLevel.cages
-                levels[index].white_dots = loadedLevel.white_dots
-                levels[index].black_dots = loadedLevel.black_dots
-                levels[index].negative_constraint = loadedLevel.negative_constraint
-                levels[index].parity = loadedLevel.parity
-            }
-        }
+    func getLevel(by id: Int) -> SudokuLevel? {
+        ensureLevelsLoaded()
+        // Standard levels are 1-indexed, array is 0-indexed.
+        let index = id - 1
+        guard !levels.isEmpty, levels.indices.contains(index) else { return nil }
+        return levels[index]
     }
     
     // MARK: - SwiftData Persistence

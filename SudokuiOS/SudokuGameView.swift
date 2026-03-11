@@ -421,17 +421,17 @@ struct SudokuGameView: View {
     #Preview {
         let container = try! ModelContainer(for: UserLevelProgress.self, MoveHistory.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let levelVM = LevelViewModel(modelContext: container.mainContext)
-        Task {
-            await levelVM.loadLevelsFromJSON()
-        }
         
-        return Group {
+        Group {
             SudokuGameView(levelID: 1, viewModel: levelVM, adCoordinator: AdCoordinator())
                 .environment(AppSettings())
             
             SudokuGameView(levelID: 1, viewModel: levelVM, adCoordinator: AdCoordinator())
                 .environment(AppSettings())
                 .preferredColorScheme(.dark)
+        }
+        .onAppear {
+            levelVM.ensureLevelsLoaded()
         }
     }
     

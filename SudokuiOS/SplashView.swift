@@ -110,7 +110,7 @@ extension SplashView {
             }
         }
         
-        /* Transition is now handled by levelViewModel.isLoading in SudokuiOSApp */
+        /* Transition is now handled by direct navigation or local state in SudokuiOSApp */
     }
 }
 

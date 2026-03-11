@@ -17,31 +17,37 @@ class LevelViewModelTests: XCTestCase {
     }
     
     func testInitialState() {
-        // Since loading will be async, we might need to wait or check initial state before load
-        // But for now, let's assume we want to test the full load
+        XCTAssertTrue(viewModel.levels.isEmpty, "Levels should be empty initially due to lazy loading")
     }
     
-    func testAsyncLevelLoading() async {
-        // 1. Initialize ViewModel
-        // Note: LevelViewModel is @MainActor, so this test should also be @MainActor or handled accordingly
-        let expectation = XCTestExpectation(description: "Levels should load asynchronously")
+    func testLazyLevelLoading() {
+        // 1. Initial State
+        XCTAssertTrue(viewModel.levels.isEmpty)
         
-        // 2. Observe isLoading (we'll add this property soon)
-        // Since we can't easily use Combine here without more setup, we can poll or use a Task
+        // 2. Trigger Lazy Load
+        viewModel.ensureLevelsLoaded()
         
-        let viewModel = await LevelViewModel()
+        // 3. Verify Data
+        XCTAssertFalse(viewModel.levels.isEmpty, "Levels should be populated after ensureLevelsLoaded()")
+        XCTAssertEqual(viewModel.levels.count, 600, "Should have exactly 600 standard levels")
         
-        // 3. Wait for loading to finish
-        // We'll check if isLoading becomes false
-        var timeout = 5.0
-        while await viewModel.isLoading && timeout > 0 {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
-            timeout -= 0.1
-        }
+        let firstLevel = viewModel.getLevel(by: 1)
+        XCTAssertNotNil(firstLevel?.board, "Level 1 should have board data")
+        XCTAssertEqual(firstLevel?.id, 1)
+    }
+    
+    func testGetLevelBoundsSafety() {
+        // 1. Valid bounds
+        let validLevel = viewModel.getLevel(by: 1)
+        XCTAssertNotNil(validLevel)
         
-        XCTAssertFalse(await viewModel.isLoading, "Loading should complete")
-        XCTAssertFalse(await viewModel.levels.isEmpty, "Levels should not be empty after loading")
-        expectation.fulfill()
+        // 2. Lower bound out of range
+        let tooLow = viewModel.getLevel(by: 0)
+        XCTAssertNil(tooLow)
+        
+        // 3. Upper bound out of range
+        let tooHigh = viewModel.getLevel(by: 9999)
+        XCTAssertNil(tooHigh)
     }
     
     func testVariantRuleMapping() throws {

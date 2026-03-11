@@ -14,7 +14,7 @@ struct SudokuiOSApp: App {
     @State private var appSettings: AppSettings?
     @Environment(\.scenePhase) private var scenePhase
     
-    // Splash Screen State handled by LevelViewModel.isLoading
+    // Splash Screen State handled by LevelViewModel.ensureLevelsLoaded() lazily
     
     init() {
         do {

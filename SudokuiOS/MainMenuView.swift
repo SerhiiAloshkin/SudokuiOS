@@ -96,41 +96,18 @@ struct MainMenuView: View {
                                         }
                                     } else {
                                         let level = viewModel.levels.first(where: { $0.id == session.levelID })
-                                        let isDataReady = level?.board != nil
-                                        
                                         Button(action: {
-                                            if isDataReady {
-                                                navigationPath = [.game(session.levelID, session: session)]
-                                            }
+                                            navigationPath = [.game(session.levelID, session: session)]
                                         }) {
-                                            if isDataReady {
-                                                continueCardContent(
-                                                    title: "Level \(session.levelID)",
-                                                    iconName: level?.ruleType.iconName ?? "square.grid.3x3",
-                                                    ruleName: level?.ruleType.displayName ?? "Sudoku",
-                                                    timeElapsed: session.timeElapsed
-                                                )
-                                                .clipShape(RoundedRectangle(cornerRadius: 18))
-                                            } else {
-                                                // Loading Placeholder for the card
-                                                HStack {
-                                                    VStack(alignment: .leading, spacing: 4) {
-                                                        Text("Continue Level \(session.levelID)")
-                                                            .font(.headline)
-                                                        Text("Loading metadata...")
-                                                            .font(.caption)
-                                                            .foregroundColor(.secondary)
-                                                    }
-                                                    Spacer()
-                                                    ProgressView()
-                                                }
-                                                .padding()
-                                                .background(Color.themeBlue.opacity(0.05))
-                                                .clipShape(RoundedRectangle(cornerRadius: 18))
-                                            }
+                                            continueCardContent(
+                                                title: "Level \(session.levelID)",
+                                                iconName: level?.ruleType.iconName ?? "square.grid.3x3",
+                                                ruleName: level?.ruleType.displayName ?? "Sudoku",
+                                                timeElapsed: session.timeElapsed
+                                            )
+                                            .clipShape(RoundedRectangle(cornerRadius: 18))
                                         }
                                         .buttonStyle(.plain)
-                                        .disabled(!isDataReady)
                                     }
                                 }
                                 // 2. Select Level (Primary Action)
@@ -231,12 +208,8 @@ struct MainMenuView: View {
                     viewModel.loadProgressFromSwiftData()
                 }
                 
-                // Load levels if empty (needed for Continue button metadata)
-                if viewModel.levels.isEmpty {
-                    Task {
-                        await viewModel.loadLevelsFromJSON()
-                    }
-                }
+                // Ensure levels are loaded lazily
+                viewModel.ensureLevelsLoaded()
                 
                 loadSession()
                 

@@ -277,11 +277,7 @@ class SudokuGameViewModel: ObservableObject {
     
     private func loadLevelData(session: GameSession? = nil) {
         // Ensure data is loaded in parent
-        if parentViewModel.levels.allSatisfy({ $0.board == nil }) {
-            Task {
-                await parentViewModel.loadLevelsFromJSON()
-            }
-        }
+        parentViewModel.ensureLevelsLoaded()
         
         // Find the level (Standard or Injected Custom)
         guard let level = parentViewModel.levels.first(where: { $0.id == levelID }) else {
