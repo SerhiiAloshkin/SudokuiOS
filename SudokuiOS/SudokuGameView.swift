@@ -337,8 +337,8 @@ struct SudokuGameView: View {
                             let num = r * 3 + c + 1
                             if cell.notes.contains(num) {
                                 Text("\(num)")
-                                    .font(.system(size: cellSize * 0.25, weight: .regular, design: .rounded))
-                                    .minimumScaleFactor(0.5)
+                                    .font(.system(size: max(9, cellSize * 0.28), weight: .regular, design: .rounded))
+                                    .minimumScaleFactor(0.6)
                                     .foregroundColor(.primary)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                             } else {
@@ -349,7 +349,7 @@ struct SudokuGameView: View {
                     }
                 }
             }
-            .padding(isKiller ? 8 : 2) // Compact notes to avoid overlapping killer cage values
+            .padding(isKiller ? 4 : 2) // Adjusted padding for better fit
         }
     }
     
