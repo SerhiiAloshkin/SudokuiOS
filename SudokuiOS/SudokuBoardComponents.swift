@@ -54,6 +54,7 @@ struct PreviewSudokuCellView: View {
                             Text("\(num)")
                                 .font(.system(size: max(isKiller ? 8 : 9, cellSize * (isKiller ? 0.18 : 0.28)), weight: .regular, design: .rounded))
                                 .minimumScaleFactor(0.6)
+                                .lineLimit(1)
                                 .foregroundColor(.primary)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
@@ -64,9 +65,10 @@ struct PreviewSudokuCellView: View {
                 }
             }
         }
-        .padding(.top, isKiller ? cellSize * 0.12 : 0)
-        .padding(.leading, isKiller ? cellSize * 0.12 : 0)
-        .padding(2) 
+        .padding(.top, isKiller ? cellSize * 0.18 : 2)
+        .padding(.leading, isKiller ? cellSize * 0.15 : 2)
+        .padding(.bottom, isKiller ? cellSize * 0.08 : 2)
+        .padding(.trailing, isKiller ? cellSize * 0.08 : 2)
     }
 }
 
