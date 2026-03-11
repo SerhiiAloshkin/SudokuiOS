@@ -49,3 +49,26 @@ struct UtilityVersaButtonStyle: ButtonStyle {
             .animation(.interactiveSpring(), value: configuration.isPressed)
     }
 }
+
+/// A general-purpose rounded button style used for in-game actions
+struct VersaButtonStyle: ButtonStyle {
+    var isEnabled: Bool = true
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .bold, design: .rounded))
+            .foregroundColor(isEnabled ? .primary : .secondary.opacity(0.5))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isEnabled ? Color.themeBlue.opacity(0.15) : Color.gray.opacity(0.1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isEnabled ? Color.themeBlue.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
