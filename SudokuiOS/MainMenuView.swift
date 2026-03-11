@@ -12,7 +12,6 @@ struct MainMenuView: View {
     @State private var showSettings = false
     @State private var navigationPath: [SudokuRoute] = []
     @StateObject private var adCoordinator = AdCoordinator() // Manage Ads Globally/at Menu Level
-    @State private var activeSession: GameSession? = nil
     @State private var showButtons = false
     
     enum SudokuRoute: Hashable {
@@ -51,14 +50,15 @@ struct MainMenuView: View {
                         if showButtons {
                             VStack(spacing: 24) {
                                 // 1. Continue Level (Primary Card)
-                                if let session = activeSession ?? legacySession() {
+                                if let session = viewModel.activeSession {
                                     let isCustom = session.isCustomLevel
                                     
                                     if isCustom {
+                                        let lastCustomLevelUUID = UserDefaults.standard.string(forKey: "lastCustomLevelUUID") ?? ""
                                         let customLevelID = session.customLevelId ?? lastCustomLevelUUID
                                         if let customLevel = customLevels.first(where: { $0.id.uuidString == customLevelID }) {
                                             Button(action: {
-                                                navigationPath = [.customGame(customLevel, session: session)]
+                                                navigationPath = [.customLevels, .customGame(customLevel, session: session)]
                                             }) {
                                                 continueCardContent(
                                                     title: customLevel.levelName,
@@ -73,7 +73,8 @@ struct MainMenuView: View {
                                     } else {
                                         let level = viewModel.levels.first(where: { $0.id == session.levelID })
                                         Button(action: {
-                                            navigationPath = [.game(session.levelID, session: session)]
+                                            // INJECT Level Selection into history so "Back to Grid" works
+                                            navigationPath = [.levelSelection, .game(session.levelID, session: session)]
                                         }) {
                                             continueCardContent(
                                                 title: "Level \(session.levelID)",
@@ -198,7 +199,7 @@ struct MainMenuView: View {
                 // Ensure levels are loaded lazily
                 viewModel.ensureLevelsLoaded()
                 
-                loadSession()
+                viewModel.loadActiveSession()
                 
                 // Animation Logic
                 if !showButtons {
@@ -270,53 +271,6 @@ struct MainMenuView: View {
         )
         .cornerRadius(16)
         .shadow(color: Color.themeBlue.opacity(0.3), radius: 8, x: 0, y: 4)
-    }
-    private func loadSession() {
-        let lastPlayedMode = UserDefaults.standard.string(forKey: "lastPlayedMode") ?? "standard"
-        
-        if lastPlayedMode == "custom" {
-            if let customLevel = customLevels.first(where: { $0.id.uuidString == lastCustomLevelUUID }),
-               customLevel.savedBoardProgress != nil {
-                // Return a "Skeleton" session to satisfy the UI, although we could also 
-                // refactor the UI to check both. For now, feeding a minimal session is safest.
-                var session = GameSession(
-                    levelID: -1, // Not used for custom
-                    isCustomLevel: true,
-                    customLevelId: lastCustomLevelUUID
-                )
-                session.userBoard = customLevel.savedBoardProgress
-                session.timeElapsed = customLevel.savedTime
-                session.notesData = customLevel.savedNotesData
-                session.colorData = customLevel.savedColorData
-                session.markedCombinationsData = customLevel.savedMarkedCombinationsData
-                session.killerMarkedCombinationsData = customLevel.savedKillerMarkedCombinationsData
-                session.crossData = customLevel.savedCrossData
-                self.activeSession = session
-            } else if let data = UserDefaults.standard.data(forKey: "active_custom_session"),
-                      let session = try? JSONDecoder().decode(GameSession.self, from: data) {
-                self.activeSession = session
-            }
-        } else {
-            // Standard fallback
-            if let data = UserDefaults.standard.data(forKey: "active_standard_session"),
-               let session = try? JSONDecoder().decode(GameSession.self, from: data) {
-                self.activeSession = session
-            } else if let data = UserDefaults.standard.data(forKey: "activeGameSession"), // FINAL LEGACY FALLBACK
-                      let session = try? JSONDecoder().decode(GameSession.self, from: data) {
-                self.activeSession = session
-            }
-        }
-    }
-    
-    /// Fallback for legacy appstorage-only persistence
-    private func legacySession() -> GameSession? {
-        guard lastUnfinishedLevelID != -1 else { return nil }
-        return GameSession(
-            levelID: lastUnfinishedLevelID,
-            isCustomLevel: lastUnfinishedLevelID < 0,
-            customLevelId: lastCustomLevelUUID,
-            timestamp: lastPlayedTimestamp
-        )
     }
 }
 

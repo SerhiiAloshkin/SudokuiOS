@@ -229,6 +229,7 @@ class LevelViewModel: ObservableObject {
     @Published var levels: [SudokuLevel] = []
     @Published var customLevels: [CustomSudokuLevel] = []
     @Published var appIsReady: Bool = false
+    @Published var activeSession: GameSession? = nil
     private var hasLoadedLevels = false
  // New array for Custom Levels
     
@@ -573,6 +574,52 @@ class LevelViewModel: ObservableObject {
         
         // Cloud Sync Disabled
         // CloudStorageManager.shared.markLevelSolved(levelId)
+        
+        // Clear global active session reactively
+        self.activeSession = nil
+    }
+    
+    func loadActiveSession() {
+        let lastPlayedMode = UserDefaults.standard.string(forKey: "lastPlayedMode") ?? "standard"
+        let lastCustomLevelUUID = UserDefaults.standard.string(forKey: "lastCustomLevelUUID") ?? ""
+        
+        if lastPlayedMode == "custom" {
+            // Check if we have progress for this custom level in SwiftData/UserDefaults
+            if let context = modelContext {
+                let descriptor = FetchDescriptor<CustomSudokuLevel>()
+                let customs = (try? context.fetch(descriptor)) ?? []
+                
+                if let customLevel = customs.first(where: { $0.id.uuidString == lastCustomLevelUUID }),
+                   customLevel.savedBoardProgress != nil {
+                    var session = GameSession(
+                        levelID: -1,
+                        isCustomLevel: true,
+                        customLevelId: lastCustomLevelUUID
+                    )
+                    session.userBoard = customLevel.savedBoardProgress
+                    session.timeElapsed = customLevel.savedTime
+                    session.notesData = customLevel.savedNotesData
+                    session.colorData = customLevel.savedColorData
+                    session.markedCombinationsData = customLevel.savedMarkedCombinationsData
+                    session.killerMarkedCombinationsData = customLevel.savedKillerMarkedCombinationsData
+                    session.crossData = customLevel.savedCrossData
+                    self.activeSession = session
+                    return
+                }
+            }
+        }
+        
+        // standard fallback
+        let key = (lastPlayedMode == "custom") ? "active_custom_session" : "active_standard_session"
+        if let data = UserDefaults.standard.data(forKey: key),
+           let session = try? JSONDecoder().decode(GameSession.self, from: data) {
+            self.activeSession = session
+        } else if let data = UserDefaults.standard.data(forKey: "activeGameSession"),
+                  let session = try? JSONDecoder().decode(GameSession.self, from: data) {
+            self.activeSession = session
+        } else {
+            self.activeSession = nil
+        }
     }
     
     func saveLevelProgress(levelId: Int, customUUID: String? = nil, currentBoard: String, notesData: Data? = nil, colorData: Data? = nil, markedCombinationsData: Data? = nil, killerMarkedCombinationsData: Data? = nil, crossData: Data? = nil, timeElapsed: Int = 0) {

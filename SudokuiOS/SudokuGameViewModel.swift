@@ -542,8 +542,12 @@ class SudokuGameViewModel: ObservableObject {
         if !isCustomLevel {
             if let encoded = try? JSONEncoder().encode(session) {
                 UserDefaults.standard.set(encoded, forKey: sessionKey)
+                // Sync to global active session for reactivity
+                parentViewModel.activeSession = session
             }
         } else {
+            // Update custom level session state globally
+            parentViewModel.activeSession = session
             // Optional: clear the old heavy session data to save memory
             UserDefaults.standard.removeObject(forKey: "active_custom_session")
         }
