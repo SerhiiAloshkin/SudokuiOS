@@ -136,12 +136,49 @@ private struct BuilderSection: View {
 private struct SettingsSection: View {
     var body: some View {
         EncyclopediaCard(title: "Game Settings", icon: "gearshape.fill") {
-            EncyclopediaItem(icon: "selection.pin.in.out", title: "Highlight: Restriction", description: "Highlights cells that conflict with your selection (same row, column, or box). Recommended!")
-            EncyclopediaItem(icon: "viewfinder", title: "Highlight: Potential", description: "Highlights all valid empty cells where the selected digit can fit.")
+            EncyclopediaItem(icon: "paintbrush.fill", title: "Theme", description: "Choose between Light or Dark mode, or select 'System' to follow your device's appearance settings.")
             
-            EncyclopediaItem(icon: "exclamationmark.triangle.fill", title: "Show Mistakes", description: "'Immediate' flags errors instantly in red. 'When Full' only checks when the board is finished.")
+            Divider().padding(.vertical, 4)
             
-            EncyclopediaItem(icon: "line.3.horizontal.decrease.circle", title: "Auto-Filter", description: "Automatically eliminates mathematically impossible note combinations for Killer Cages and Sandwiches.")
+            Group {
+                Text("Highlight Mode")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.themeBlue)
+                
+                EncyclopediaItem(icon: "highlighter", title: "None", description: "Disables all highlighting for a pure paper Sudoku experience.")
+                EncyclopediaItem(icon: "selection.pin.in.out", title: "Selection", description: "Highlights only the currently selected cell(s).")
+                EncyclopediaItem(icon: "viewfinder", title: "Restriction", description: "(Recommended) Highlights the selected cell's row, column, and 3x3 box, as well as all matching digits across the board.")
+            }
+            
+            Divider().padding(.vertical, 4)
+            
+            Group {
+                Text("Show Mistakes")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.themeBlue)
+                
+                EncyclopediaItem(icon: "exclamationmark.triangle.fill", title: "Immediate", description: "Flags conflicting or mathematically incorrect digits in red the moment they are entered.")
+                EncyclopediaItem(icon: "checkmark.circle.fill", title: "When Board Full", description: "Only reveals errors once you have completely filled all 81 cells.")
+                EncyclopediaItem(icon: "prohibited", title: "Never", description: "The game will never flag errors. Use this for a truly 'Hardcore' challenge.")
+            }
+            
+            Divider().padding(.vertical, 4)
+            
+            EncyclopediaItem(icon: "slider.horizontal.3", title: "Auto-filter Combinations", description: "When enabled, the game automatically removes mathematically impossible notes inside Killer Cages and Sandwiches based on the target sums.")
+            
+            Divider().padding(.vertical, 4)
+            
+            Group {
+                Text("Hint Target")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.themeBlue)
+                
+                EncyclopediaItem(icon: "scope", title: "Selected Cell", description: "Using a hint will attempt to find a logical deduction specifically for the cell you currently have highlighted.")
+                EncyclopediaItem(icon: "target", title: "Random Cell", description: "The engine will look at the entire board and reveal the next easiest logical step anywhere on the grid.")
+            }
         }
     }
 }
