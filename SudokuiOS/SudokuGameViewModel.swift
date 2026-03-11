@@ -1654,7 +1654,7 @@ class SudokuGameViewModel: ObservableObject {
         guard !isGameOver && !isSolved else { return }
         
         // 1. Check user preference
-        let appliesToSelected = UserDefaults.standard.bool(forKey: "hintAppliesToSelectedCell")
+        let appliesToSelected = settings?.hintTarget == .selectedCell
         
         var targetIndex: Int? = nil
         

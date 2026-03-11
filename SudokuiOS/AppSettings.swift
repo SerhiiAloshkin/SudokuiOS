@@ -21,6 +21,18 @@ enum MistakeMode: String, CaseIterable, Codable {
     }
 }
 
+enum HintTarget: String, CaseIterable, Codable {
+    case selectedCell = "selectedCell"
+    case randomCell = "randomCell"
+    
+    var text: String {
+        switch self {
+        case .selectedCell: return "Selected Cell"
+        case .randomCell: return "Random Cell"
+        }
+    }
+}
+
 @Model
 final class AppSettings {
     var isMinimalHighlight: Bool = true
@@ -30,14 +42,16 @@ final class AppSettings {
     var isHighlightSameNumberEnabled: Bool = true // Default true
     var isHighlightSameNoteEnabled: Bool = true // Default true
     var showMistakes: Bool = true // Deprecated, keeping for migration/fallback
-    var mistakeModeRaw: String = "onFull" // Default .whenBoardFull
+    var mistakeModeRaw: String = "onFull" // Default .onFull
     var hasSeenPotentialWarning: Bool = false
     var hasSeenTutorial: Bool = false
     var isDisableCompletedDigitsEnabled: Bool = true
     var isCombinationHelperEnabled: Bool = true
-    var isAutoFilterCombinationsEnabled: Bool = true
+    var isAutoFilterCombinationsEnabled: Bool = false // Default Off
+    var hintTargetRaw: String = "selectedCell" // Default Selected Cell
+    var appThemeRaw: String = "light" // Default Light
     
-    init(isMinimalHighlight: Bool = true, highlightMode: HighlightMode = .restriction, isTimerVisible: Bool = true, isHighlightSameNumberEnabled: Bool = true, isHighlightSameNoteEnabled: Bool = true, showMistakes: Bool = true, mistakeMode: MistakeMode = .onFull, hasSeenPotentialWarning: Bool = false, hasSeenTutorial: Bool = false, isDisableCompletedDigitsEnabled: Bool = true, isCombinationHelperEnabled: Bool = true, isAutoFilterCombinationsEnabled: Bool = true) {
+    init(isMinimalHighlight: Bool = true, highlightMode: HighlightMode = .restriction, isTimerVisible: Bool = true, isHighlightSameNumberEnabled: Bool = true, isHighlightSameNoteEnabled: Bool = true, showMistakes: Bool = true, mistakeMode: MistakeMode = .onFull, hasSeenPotentialWarning: Bool = false, hasSeenTutorial: Bool = false, isDisableCompletedDigitsEnabled: Bool = true, isCombinationHelperEnabled: Bool = true, isAutoFilterCombinationsEnabled: Bool = false, hintTarget: HintTarget = .selectedCell, theme: AppTheme = .light) {
         self.isMinimalHighlight = isMinimalHighlight
         self.highlightModeRaw = highlightMode.rawValue
         self.isTimerVisible = isTimerVisible
@@ -51,6 +65,8 @@ final class AppSettings {
         self.isDisableCompletedDigitsEnabled = isDisableCompletedDigitsEnabled
         self.isCombinationHelperEnabled = isCombinationHelperEnabled
         self.isAutoFilterCombinationsEnabled = isAutoFilterCombinationsEnabled
+        self.hintTargetRaw = hintTarget.rawValue
+        self.appThemeRaw = theme.rawValue
     }
     
     // Bridge to UserDefaults for Ad Free Status (User Request)
@@ -89,13 +105,22 @@ final class AppSettings {
     }
     
     var mistakeMode: MistakeMode {
-        get { MistakeMode(rawValue: mistakeModeRaw) ?? .immediate }
+        get { MistakeMode(rawValue: mistakeModeRaw) ?? .onFull }
         set { mistakeModeRaw = newValue.rawValue }
+    }
+    
+    var hintTarget: HintTarget {
+        get { HintTarget(rawValue: hintTargetRaw) ?? .selectedCell }
+        set { 
+            hintTargetRaw = newValue.rawValue
+            // Sync to legacy UserDefaults for ViewModel access
+            UserDefaults.standard.set(newValue == .selectedCell, forKey: "hintAppliesToSelectedCell")
+        }
     }
     
     var appThemeRaw: String = "light"
     var appTheme: AppTheme {
-        get { AppTheme(rawValue: appThemeRaw) ?? .system }
+        get { AppTheme(rawValue: appThemeRaw) ?? .light }
         set { appThemeRaw = newValue.rawValue }
     }
 }

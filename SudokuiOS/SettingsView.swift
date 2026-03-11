@@ -17,7 +17,6 @@ struct SettingsView: View {
     @State private var mailResult: Result<MFMailComposeResult, Error>?
     @State private var showMailFallbackAlert = false
     
-    @AppStorage("hintAppliesToSelectedCell") private var hintAppliesToSelectedCell: Bool = false
     @AppStorage("isMistakeLimitEnabled") private var isMistakeLimitEnabled: Bool = true
     @AppStorage("showHintButton") private var showHintButton: Bool = true
     
@@ -80,9 +79,10 @@ struct SettingsView: View {
                     Toggle("Show Combination Helpers", isOn: $settings.isCombinationHelperEnabled)
                     Toggle("Auto-Filter Combinations", isOn: $settings.isAutoFilterCombinationsEnabled)
                     
-                    Picker("Hint Target", selection: $hintAppliesToSelectedCell) {
-                        Text("Random Cell").tag(false)
-                        Text("Selected Cell").tag(true)
+                    Picker("Hint Target", selection: $settings.hintTarget) {
+                        ForEach(HintTarget.allCases, id: \.self) { target in
+                            Text(target.text).tag(target)
+                        }
                     }
                     .pickerStyle(.menu)
                 }
