@@ -67,8 +67,8 @@ private struct GameScreenSection: View {
 private struct NumpadSection: View {
     var body: some View {
         EncyclopediaCard(title: "Numpad & Input Modes", icon: "number.square.fill") {
-            EncyclopediaItem(icon: "pencil.line", title: "Pen Mode", description: "Enters final large digits. Use this when you are certain of a value.")
-            EncyclopediaItem(icon: "pencil", title: "Pencil (Notes)", description: "Enters small candidate digits for tracking possibilities.")
+            EncyclopediaItem(icon: "pencil.slash", title: "Pen Mode", description: "Enters final large digits. Use this when you are certain of a value.")
+            EncyclopediaItem(icon: "pencil.circle.fill", title: "Pencil (Notes)", description: "Enters small candidate digits for tracking possibilities.")
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
