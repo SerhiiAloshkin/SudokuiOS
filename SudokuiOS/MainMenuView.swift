@@ -96,18 +96,41 @@ struct MainMenuView: View {
                                         }
                                     } else {
                                         let level = viewModel.levels.first(where: { $0.id == session.levelID })
+                                        let isDataReady = level?.board != nil
+                                        
                                         Button(action: {
-                                            navigationPath = [.game(session.levelID, session: session)]
+                                            if isDataReady {
+                                                navigationPath = [.game(session.levelID, session: session)]
+                                            }
                                         }) {
-                                            continueCardContent(
-                                                title: "Level \(session.levelID)",
-                                                iconName: level?.ruleType.iconName ?? "square.grid.3x3",
-                                                ruleName: level?.ruleType.displayName ?? "Sudoku",
-                                                timeElapsed: session.timeElapsed
-                                            )
-                                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                                            if isDataReady {
+                                                continueCardContent(
+                                                    title: "Level \(session.levelID)",
+                                                    iconName: level?.ruleType.iconName ?? "square.grid.3x3",
+                                                    ruleName: level?.ruleType.displayName ?? "Sudoku",
+                                                    timeElapsed: session.timeElapsed
+                                                )
+                                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                                            } else {
+                                                // Loading Placeholder for the card
+                                                HStack {
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        Text("Continue Level \(session.levelID)")
+                                                            .font(.headline)
+                                                        Text("Loading metadata...")
+                                                            .font(.caption)
+                                                            .foregroundColor(.secondary)
+                                                    }
+                                                    Spacer()
+                                                    ProgressView()
+                                                }
+                                                .padding()
+                                                .background(Color.themeBlue.opacity(0.05))
+                                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                                            }
                                         }
                                         .buttonStyle(.plain)
+                                        .disabled(!isDataReady)
                                     }
                                 }
                                 // 2. Select Level (Primary Action)

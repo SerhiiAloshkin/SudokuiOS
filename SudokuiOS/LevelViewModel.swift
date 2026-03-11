@@ -303,9 +303,6 @@ class LevelViewModel: ObservableObject {
             loadProgressFromSwiftData()
         }
         
-        // Tiny sleep for smooth transition as requested
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
-        
         self.isLoading = false
     }
     

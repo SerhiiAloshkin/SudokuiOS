@@ -80,18 +80,31 @@ struct LevelSelectionView: View {
             // MARK: - Scrollable Grid
             ScrollView {
                 ScrollViewReader { proxy in
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(selectionViewModel.filteredLevels) { level in
-                            LevelItemView(level: level, action: {
-                                handleLevelTap(level)
-                            })
-                            .id(level.id)
-                            // Removed .disabled(level.isLocked) to allow interaction for ads
-                            .id(level.id) // Essential for scrolling
+                    ZStack {
+                        if globalViewModel.isLoading && selectionViewModel.levels.isEmpty {
+                            VStack(spacing: 20) {
+                                ProgressView()
+                                    .scaleEffect(1.5)
+                                Text("Loading Levels...")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 400)
+                        } else {
+                            LazyVGrid(columns: columns, spacing: 10) {
+                                ForEach(selectionViewModel.filteredLevels) { level in
+                                    LevelItemView(level: level, action: {
+                                        handleLevelTap(level)
+                                    })
+                                    .id(level.id)
+                                    // Removed .disabled(level.isLocked) to allow interaction for ads
+                                    .id(level.id) // Essential for scrolling
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, 80) // Space for bottom panel
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 80) // Space for bottom panel
                     // Hidden Navigation Link for Game
                     .padding(.bottom, 80) // Space for bottom panel
 

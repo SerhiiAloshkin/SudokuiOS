@@ -276,7 +276,6 @@ struct LevelBuilderView: View {
     @ViewBuilder
     private func sandwichClueButton(index: Int, isRow: Bool, cellSize: CGFloat) -> some View {
         let clue = isRow ? viewModel.sandwichRowClues[index] : viewModel.sandwichColClues[index]
-        let isEraser = viewModel.selectedTool == .erase
         let hasClue = clue != nil
         
         Button(action: { viewModel.handleSandwichTap(index: index, isRow: isRow) }) {
