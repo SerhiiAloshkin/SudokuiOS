@@ -11,6 +11,7 @@ struct SudokuiOSApp: App {
     
     // 2. Create ViewModel (StateObject ensures it lives as long as the app)
     @StateObject private var levelViewModel: LevelViewModel
+    @StateObject private var storeManager = StoreManager()
     @State private var appSettings: AppSettings?
     @Environment(\.scenePhase) private var scenePhase
     
@@ -76,10 +77,12 @@ struct SudokuiOSApp: App {
                 if levelViewModel.appIsReady {
                     MainMenuView()
                         .environmentObject(levelViewModel)
+                        .environmentObject(storeManager)
                         .transition(.opacity)
                 } else {
                     SplashView(isActive: .constant(true))
                         .environmentObject(levelViewModel)
+                        .environmentObject(storeManager)
                 }
             }
             .animation(.easeInOut(duration: 0.5), value: levelViewModel.appIsReady)

@@ -5,7 +5,7 @@ import Observation
 @MainActor
 struct SudokuGameView: View {
     @StateObject private var gameViewModel: SudokuGameViewModel
-    @StateObject private var storeManager = StoreManager()
+    @EnvironmentObject private var storeManager: StoreManager
     
     var onNextLevel: (Int) -> Void = { _ in } // Callback for next level navigation, receives Target ID
     @ObservedObject var adCoordinator: AdCoordinator // Injected for Rewarded Ads

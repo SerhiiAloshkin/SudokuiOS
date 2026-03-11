@@ -6,7 +6,7 @@ import MessageUI
 struct SettingsView: View {
     @Bindable var settings: AppSettings
     @Environment(\.dismiss) var dismiss
-    @StateObject private var storeManager = StoreManager()
+    @EnvironmentObject private var storeManager: StoreManager
     
     // Warning State
     @State private var showPotentialWarning = false
@@ -16,6 +16,8 @@ struct SettingsView: View {
     @State private var showingMail = false
     @State private var mailResult: Result<MFMailComposeResult, Error>?
     @State private var showMailFallbackAlert = false
+    
+    @State private var showPurchaseError = false
     
     @AppStorage("isMistakeLimitEnabled") private var isMistakeLimitEnabled: Bool = true
     @AppStorage("showHintButton") private var showHintButton: Bool = true
@@ -122,6 +124,9 @@ struct SettingsView: View {
                         Button(action: {
                             Task {
                                 await storeManager.purchaseRemoveAds()
+                                if storeManager.purchaseError != nil {
+                                    showPurchaseError = true
+                                }
                             }
                         }) {
                             HStack {
@@ -129,6 +134,9 @@ struct SettingsView: View {
                                 Spacer()
                                 if storeManager.isPurchasing {
                                     ProgressView()
+                                } else if storeManager.products.isEmpty {
+                                    Text("Loading...")
+                                        .foregroundColor(.secondary)
                                 } else {
                                     if let product = storeManager.products.first(where: { $0.id == "com.versa.removeads" }) {
                                         Text(product.displayPrice)
@@ -140,12 +148,17 @@ struct SettingsView: View {
                                 }
                             }
                         }
+                        .disabled(storeManager.isPurchasing || storeManager.products.isEmpty)
                         
                         Button("Restore Purchases") {
                             Task {
                                 await storeManager.restorePurchases()
+                                if storeManager.purchaseError != nil {
+                                    showPurchaseError = true
+                                }
                             }
                         }
+                        .disabled(storeManager.isPurchasing)
                     }
                 }
                 

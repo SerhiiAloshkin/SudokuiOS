@@ -36,6 +36,7 @@ class StoreManager: ObservableObject {
     
     func purchaseRemoveAds() async {
         guard let product = products.first(where: { $0.id == "com.versa.removeads" }) else {
+            print("ERROR: Product 'com.versa.removeads' not found in products array. Current products: \(products.map { $0.id })")
             purchaseError = "Product not found"
             return
         }
