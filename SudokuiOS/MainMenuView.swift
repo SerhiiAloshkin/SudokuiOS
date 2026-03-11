@@ -22,6 +22,7 @@ struct MainMenuView: View {
         case customLevels
         case customGame(CustomSudokuLevel, session: GameSession?)
         case game(Int, session: GameSession?)
+        case howToPlay
     }
     
     var body: some View {
@@ -122,6 +123,21 @@ struct MainMenuView: View {
                                 .buttonStyle(SecondaryButtonStyle())
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                                 
+                                .buttonStyle(SecondaryButtonStyle())
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                                
+                                // 2.7 How to Play
+                                Button(action: {
+                                    navigationPath.append(.howToPlay)
+                                }) {
+                                    HStack {
+                                        Image(systemName: "questionmark.circle")
+                                        Text("How to Play")
+                                    }
+                                }
+                                .buttonStyle(SecondaryButtonStyle())
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                                
                                 // 3. Settings (Secondary Action)
                                 Button(action: {
                                     showSettings = true
@@ -174,7 +190,9 @@ struct MainMenuView: View {
                          }
                      })
                      .id(id) // Force recreation of StateObject when ID changes
-                }
+                 case .howToPlay:
+                     HowToPlayView()
+                 }
             }
             .onAppear {
                 // crucial: inject context if not already done, and reload
