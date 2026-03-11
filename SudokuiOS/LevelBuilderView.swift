@@ -19,29 +19,38 @@ struct LevelBuilderView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            headerView
-            globalRulesToggles
-            toolPalette
-            contextualPalette
-            Spacer(minLength: 4)
-            gridMatrix
-            Spacer(minLength: 4)
-            bottomControls
-        }
-        .navigationBarHidden(true)
-        .onChange(of: viewModel.validationResult) { _, result in
-            if result != nil { showingAlert = true }
-        }
-        .alert("Status", isPresented: $showingAlert, presenting: viewModel.validationResult) { _ in
-            Button("OK") {
-                if viewModel.validationResult == "Saved successfully!" {
-                    navigationStack.removeLast()
-                }
-                viewModel.validationResult = nil
+        ZStack {
+            VStack(spacing: 0) {
+                headerView
+                globalRulesToggles
+                toolPalette
+                contextualPalette
+                Spacer(minLength: 4)
+                gridMatrix
+                Spacer(minLength: 4)
+                bottomControls
             }
-        } message: { result in
-            Text(result)
+            .navigationBarHidden(true)
+            .blur(radius: viewModel.activeMessage != nil ? 3 : 0)
+            
+            // Custom Message Overlay
+            if let message = viewModel.activeMessage {
+                BuilderMessageOverlayView(
+                    title: message.title,
+                    message: message.message,
+                    footnote: message.footnote,
+                    action: {
+                        withAnimation {
+                            if message.message == "Saved successfully!" || message.message == "Updated successfully!" {
+                                navigationStack.removeLast()
+                            }
+                            viewModel.activeMessage = nil
+                        }
+                    }
+                )
+                .transition(.opacity.combined(with: .scale))
+                .zIndex(100)
+            }
         }
         .sensoryFeedback(.warning, trigger: viewModel.showInvalidTapFeedback)
         .alert("Cage Sum", isPresented: $viewModel.showCageSumPrompt) {

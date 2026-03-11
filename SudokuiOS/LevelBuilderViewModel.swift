@@ -59,7 +59,9 @@ class LevelBuilderViewModel: ObservableObject {
     
     // MARK: - Validation
     @Published var isValidating: Bool = false
-    @Published var validationResult: String? = nil
+    @Published var activeMessage: BuilderMessage? = nil
+    
+    private let verificationFootnote = "Note: Automated verification can make mistakes or might not cover all logical paths a human can."
     
     // MARK: - Board Rules Data (Published for UI reactivity)
     @Published var arrows: [SudokuLevel.Arrow] = []
@@ -522,10 +524,10 @@ class LevelBuilderViewModel: ObservableObject {
                 
                 do {
                     try context.save()
-                    self.validationResult = "Updated successfully!"
+                    self.activeMessage = BuilderMessage(title: "Success", message: "Updated successfully!", footnote: nil)
                     return
                 } catch {
-                    self.validationResult = "Failed to update: \(error.localizedDescription)"
+                    self.activeMessage = BuilderMessage(title: "Error", message: "Failed to update: \(error.localizedDescription)", footnote: nil)
                     return
                 }
             }
@@ -535,15 +537,15 @@ class LevelBuilderViewModel: ObservableObject {
         context.insert(customLevel)
         do {
             try context.save()
-            self.validationResult = "Saved successfully!"
+            self.activeMessage = BuilderMessage(title: "Success", message: "Level saved successfully!", footnote: nil)
         } catch {
-            self.validationResult = "Failed to save: \(error.localizedDescription)"
+            self.activeMessage = BuilderMessage(title: "Error", message: "Failed to save: \(error.localizedDescription)", footnote: nil)
         }
     }
     
     func checkValidation() {
         isValidating = true
-        validationResult = nil
+        activeMessage = nil
         
         let customLevel = buildCustomLevel()
         
@@ -554,9 +556,17 @@ class LevelBuilderViewModel: ObservableObject {
             self.isValidating = false
             
             if unsolvedCount == 0 && !stalled {
-                self.validationResult = "Level has a unique Human-Solvable solution!"
+                self.activeMessage = BuilderMessage(
+                    title: "Status",
+                    message: "Level has a unique Human-Solvable solution!",
+                    footnote: verificationFootnote
+                )
             } else {
-                self.validationResult = "Level is not cleanly Human-Solvable (Unsolved cells: \(unsolvedCount))"
+                self.activeMessage = BuilderMessage(
+                    title: "Status",
+                    message: "Level is not cleanly Human-Solvable (Unsolved cells: \(unsolvedCount))",
+                    footnote: verificationFootnote
+                )
             }
         }
     }
