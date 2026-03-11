@@ -170,7 +170,9 @@ struct SudokuGameView: View {
             ToolbarItem(placement: .topBarLeading) {
                 HStack(spacing: 20) {
                     Button(action: {
-                        gameViewModel.saveState()
+                        if !gameViewModel.isSolved && !gameViewModel.isGameComplete {
+                            gameViewModel.saveState()
+                        }
                         dismiss()
                     }) {
                         Image(systemName: "chevron.left")
@@ -503,7 +505,9 @@ struct SudokuGameView: View {
                         
                         // Close (Secondary)
                         Button(action: {
-                            gameViewModel.saveState()
+                            if !gameViewModel.isSolved && !gameViewModel.isGameComplete {
+                                gameViewModel.saveState()
+                            }
                             dismiss()
                         }) {
                             Text("Close Level")

@@ -502,6 +502,9 @@ class SudokuGameViewModel: ObservableObject {
     }
     
     func saveGameSession() {
+        // Skip saving session if game is already complete
+        if isSolved || isGameComplete { return }
+        
         guard let level = parentViewModel.levels.first(where: { $0.id == levelID }) else { return }
         
         var session = GameSession(
@@ -594,7 +597,10 @@ class SudokuGameViewModel: ObservableObject {
         parentViewModel.saveLevelProgress(levelId: levelID, customUUID: customLevelUUID, currentBoard: currentBoardString, notesData: notesData, colorData: colorData, markedCombinationsData: markedCombinationsData, killerMarkedCombinationsData: killerMarkedCombinationsData, crossData: crossData, timeElapsed: timeElapsed)
         
         // Also update Active Game Session (UserDefaults) to ensure "Continue" routing is accurate
-        saveGameSession()
+        // Skip session update if game is already complete to avoid ghost sessions
+        if !isSolved && !isGameComplete {
+            saveGameSession()
+        }
     }
     
     // MARK: - Input Logic
@@ -1512,9 +1518,18 @@ class SudokuGameViewModel: ObservableObject {
              }
         }
         
-        // Clear Active Game Session
-        UserDefaults.standard.removeObject(forKey: "activeGameSession")
+        // Clear Active Game Session (Comprehensive Cleanup)
+        let standardKey = "active_standard_session"
+        let customKey = "active_custom_session"
+        let legacyKey = "activeGameSession"
+        
+        UserDefaults.standard.removeObject(forKey: standardKey)
+        UserDefaults.standard.removeObject(forKey: customKey)
+        UserDefaults.standard.removeObject(forKey: legacyKey)
+        UserDefaults.standard.removeObject(forKey: "lastPlayedMode")
         UserDefaults.standard.set(-1, forKey: "lastUnfinishedLevelID") // Legacy Cleanup
+        UserDefaults.standard.set(0.0, forKey: "lastPlayedTimestamp")
+        UserDefaults.standard.set("", forKey: "lastCustomLevelUUID")
         
         // 4. Persistence
         saveState()
