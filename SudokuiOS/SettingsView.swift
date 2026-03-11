@@ -209,6 +209,11 @@ struct SettingsView: View {
             } message: {
                 Text("Your device is not configured to send emails. Please contact us at \(supportEmail).")
             }
+            .alert("Purchase Error", isPresented: $showPurchaseError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(storeManager.purchaseError ?? "An unknown error occurred.")
+            }
         }
     }
     
