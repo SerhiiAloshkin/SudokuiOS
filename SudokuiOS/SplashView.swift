@@ -51,6 +51,25 @@ struct SplashView: View {
                             }
                         }
                     }
+                    
+                    // 4. Custom "Versa Style" Progress Bar
+                    VStack(spacing: 8) {
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.black.opacity(0.05))
+                                .frame(width: 200, height: 6)
+                            
+                            Capsule()
+                                .fill(getSubtitleColor())
+                                .frame(width: 200 * levelViewModel.loadingProgress, height: 6)
+                        }
+                        
+                        Text("Loading Levels...")
+                            .font(.custom("AvenirNext-Medium", size: 12))
+                            .foregroundColor(getSubtitleColor().opacity(0.6))
+                    }
+                    .padding(.top, 20)
+                    .opacity(titleOpacity) // Sync with title fade-in
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity) // Center content
             }

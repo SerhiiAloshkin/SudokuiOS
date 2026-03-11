@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import SwiftData
+import SwiftUI
 
 struct SudokuLevel: Identifiable, Codable, Equatable {
     let id: Int
@@ -227,6 +228,8 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
 class LevelViewModel: ObservableObject {
     @Published var levels: [SudokuLevel] = []
     @Published var customLevels: [CustomSudokuLevel] = []
+    @Published var isLoading: Bool = true
+    @Published var loadingProgress: CGFloat = 0.0
     private var hasLoadedLevels = false
  // New array for Custom Levels
     
@@ -280,7 +283,43 @@ class LevelViewModel: ObservableObject {
     
     init(modelContext: ModelContext? = nil) {
         self.modelContext = modelContext
-        // Instant init: Levels are loaded lazily on first access/onAppear
+        loadLevelsWithProgress()
+    }
+    
+    private func loadLevelsWithProgress() {
+        Task {
+            // 1. Start smooth progress simulation (0 -> 0.85)
+            withAnimation(.linear(duration: 0.5)) {
+                loadingProgress = 0.85
+            }
+            
+            // 2. Parse Levels.json in background
+            let loadedLevels = await Task.detached(priority: .userInitiated) {
+                return LevelViewModel.loadBundledLevels()
+            }.value
+            
+            // 3. Finalize
+            self.levels = loadedLevels
+            self.hasLoadedLevels = true
+            
+            // Apply persistent state
+            if modelContext != nil {
+                loadProgressFromSwiftData()
+            }
+            loadUnlockedLevelsFromUserDefaults()
+            
+            // 4. Smoothly hit 100%
+            withAnimation(.easeOut(duration: 0.3)) {
+                loadingProgress = 1.0
+            }
+            
+            // 5. Tiny delay for visual confirmation
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            
+            withAnimation(.easeInOut(duration: 0.4)) {
+                self.isLoading = false
+            }
+        }
     }
     
     /// Ensures levels are loaded from JSON exactly once.
@@ -296,7 +335,7 @@ class LevelViewModel: ObservableObject {
         loadUnlockedLevelsFromUserDefaults()
     }
     
-    private static func loadBundledLevels() -> [SudokuLevel] {
+    private nonisolated static func loadBundledLevels() -> [SudokuLevel] {
         var bundle: Bundle = .main
         #if SWIFT_PACKAGE
         bundle = Bundle.module

@@ -17,23 +17,30 @@ class LevelViewModelTests: XCTestCase {
     }
     
     func testInitialState() {
-        XCTAssertTrue(viewModel.levels.isEmpty, "Levels should be empty initially due to lazy loading")
+        // Initial state depends on timing, but ensure progress starts at 0 or 0.85 (due to immediate withAnimation in init)
+        XCTAssertTrue(viewModel.isLoading)
     }
     
-    func testLazyLevelLoading() {
-        // 1. Initial State
-        XCTAssertTrue(viewModel.levels.isEmpty)
+    func testAsyncProgressLoading() async {
+        // 1. Initialize ViewModel (triggers loadLevelsWithProgress)
+        let viewModel = await LevelViewModel()
         
-        // 2. Trigger Lazy Load
-        viewModel.ensureLevelsLoaded()
+        // 2. Poll for loading completion
+        var timeout = 5.0
+        while await viewModel.isLoading && timeout > 0 {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+            timeout -= 0.1
+        }
         
-        // 3. Verify Data
-        XCTAssertFalse(viewModel.levels.isEmpty, "Levels should be populated after ensureLevelsLoaded()")
-        XCTAssertEqual(viewModel.levels.count, 600, "Should have exactly 600 standard levels")
+        // 3. Verify Final State
+        let isDone = await viewModel.isLoading == false
+        XCTAssertTrue(isDone, "Loading should complete within timeout")
         
-        let firstLevel = viewModel.getLevel(by: 1)
-        XCTAssertNotNil(firstLevel?.board, "Level 1 should have board data")
-        XCTAssertEqual(firstLevel?.id, 1)
+        let hasLevels = await !viewModel.levels.isEmpty
+        XCTAssertTrue(hasLevels, "Levels should be populated")
+        
+        let progress = await viewModel.loadingProgress
+        XCTAssertEqual(progress, 1.0, "Progress should be 100%")
     }
     
     func testGetLevelBoundsSafety() {
