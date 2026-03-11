@@ -110,17 +110,12 @@ class SudokuGameViewModel: ObservableObject {
         
         // Only valid for Potential Mode
         if settings?.highlightMode == .potential {
-             // Pass parity string if rule is OddEven
-             let parity = (ruleType == .oddEven) ? parityOverlay : nil
-             
-             pointPairRestrictions = PointingPairsSolver.getPointedRestrictions(
-                board: currentBoard,
+             pointPairRestrictions = PotentialHighlightCalculator.calculatePotentials(
+                board: currentBoardArray,
                 digit: digit,
-                parityString: parity,
-                ruleType: ruleType ?? .classic,
-                whiteDots: whiteDots,
-                blackDots: blackDots,
-                negativeConstraint: negativeConstraint
+                isValid: { [weak self] d, i in
+                    self?.isPlacementValid(d, at: i) ?? false
+                }
              )
         } else {
             pointPairRestrictions = []
@@ -1842,11 +1837,44 @@ class SudokuGameViewModel: ObservableObject {
         let cell = cells[anchor]
         let digit = cell.value
         if digit != 0 {
-            // Run Pointing Pairs Solver
-            restrictedHighlightSet = PointingPairsSolver.getPointedRestrictions(board: currentBoard, digit: digit)
+            // Run Advanced Potential Highlight Calculator (Pruning & Contradictions)
+            restrictedHighlightSet = PotentialHighlightCalculator.calculatePotentials(
+                board: currentBoardArray,
+                digit: digit,
+                isValid: { [weak self] d, i in
+                    self?.isPlacementValid(d, at: i) ?? false
+                }
+            )
         } else {
             restrictedHighlightSet = []
         }
+    }
+    
+    /// Comprehensive check for whether a digit can physically be placed in a cell (including all variant rules).
+    func isPlacementValid(_ digit: Int, at index: Int) -> Bool {
+        if !isValid(digit, at: index, ignoring: -1) { return false }
+        
+        if isNonConsecutive || rules.contains(.nonConsecutive) {
+            if hasConsecutiveNeighbor(at: index, value: digit) { return false }
+        }
+        
+        if rules.contains(.kropki) {
+            if hasKropkiConflict(at: index, value: digit) { return false }
+        }
+        
+        if rules.contains(.thermo) {
+            if hasThermoConflict(at: index, value: digit) { return false }
+        }
+        
+        if rules.contains(.arrow) {
+            if hasArrowConflict(at: index, value: digit) { return false }
+        }
+        
+        if rules.contains(.killer) {
+            if hasKillerConflict(at: index, value: digit) { return false }
+        }
+        
+        return true
     }
     
     // Helper to find if all selected cells share a common non-zero digit
@@ -1961,22 +1989,7 @@ class SudokuGameViewModel: ObservableObject {
                 let cellValue = getValueAt(index)
                 
                 if cellValue == 0 {
-                    if !isValid(digit, at: index, ignoring: -1) { return isSameNoteMatch ? .sameNote : .none }
-                    if isNonConsecutive || rules.contains(.nonConsecutive) {
-                        if hasConsecutiveNeighbor(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
-                    }
-                    if rules.contains(.kropki) {
-                        if hasKropkiConflict(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
-                    }
-                    if rules.contains(.thermo) {
-                        if hasThermoConflict(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
-                    }
-                    if rules.contains(.arrow) {
-                        if hasArrowConflict(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
-                    }
-                    if rules.contains(.killer) {
-                        if hasKillerConflict(at: index, value: digit) { return isSameNoteMatch ? .sameNote : .none }
-                    }
+                    if !isPlacementValid(digit, at: index) { return isSameNoteMatch ? .sameNote : .none }
                     if pointPairRestrictions.contains(index) { return isSameNoteMatch ? .sameNote : .none }
                     if restrictedHighlightSet.contains(index) { return isSameNoteMatch ? .sameNote : .none }
                     
