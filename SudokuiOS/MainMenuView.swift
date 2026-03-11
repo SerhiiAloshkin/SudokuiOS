@@ -210,7 +210,9 @@ struct MainMenuView: View {
                 
                 // Load levels if empty (needed for Continue button metadata)
                 if viewModel.levels.isEmpty {
-                    viewModel.loadLevelsFromJSON()
+                    Task {
+                        await viewModel.loadLevelsFromJSON()
+                    }
                 }
                 
                 loadSession()

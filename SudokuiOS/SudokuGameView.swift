@@ -421,7 +421,9 @@ struct SudokuGameView: View {
     #Preview {
         let container = try! ModelContainer(for: UserLevelProgress.self, MoveHistory.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let levelVM = LevelViewModel(modelContext: container.mainContext)
-        levelVM.loadLevelsFromJSON()
+        Task {
+            await levelVM.loadLevelsFromJSON()
+        }
         
         return Group {
             SudokuGameView(levelID: 1, viewModel: levelVM, adCoordinator: AdCoordinator())
