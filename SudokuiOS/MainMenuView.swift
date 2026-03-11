@@ -32,32 +32,8 @@ struct MainMenuView: View {
                     Color(uiColor: .systemBackground)
                         .ignoresSafeArea()
                     
-                    // Floating Icons (Decorative)
-                    VStack {
-                        HStack {
-                            Image(systemName: "square.grid.3x3.fill")
-                                .font(.system(size: 80))
-                                .foregroundColor(Color.themeBlue.opacity(0.05))
-                                .rotationEffect(.degrees(-15))
-                                .offset(x: -20, y: -20)
-                            Spacer()
-                            Image(systemName: "crown.fill")
-                                .font(.system(size: 60))
-                                .foregroundColor(Color.themeBlue.opacity(0.05))
-                                .rotationEffect(.degrees(20))
-                                .offset(x: 20, y: 10)
-                        }
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Image(systemName: "thermometer")
-                                .font(.system(size: 100))
-                                .foregroundColor(Color.themeBlue.opacity(0.05))
-                                .rotationEffect(.degrees(-10))
-                                .offset(x: 30, y: 30)
-                        }
-                    }
-                    .ignoresSafeArea()
+                    WatermarkBackgroundView()
+                        .ignoresSafeArea()
                     
                     // 2. Main Content
                     VStack(spacing: 0) {
