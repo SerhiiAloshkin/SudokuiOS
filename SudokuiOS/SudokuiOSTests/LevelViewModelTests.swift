@@ -17,30 +17,24 @@ class LevelViewModelTests: XCTestCase {
     }
     
     func testInitialState() {
-        // Initial state depends on timing, but ensure progress starts at 0 or 0.85 (due to immediate withAnimation in init)
-        XCTAssertTrue(viewModel.isLoading)
+        XCTAssertFalse(viewModel.appIsReady)
+        XCTAssertTrue(viewModel.levels.isEmpty)
     }
     
     func testAsyncProgressLoading() async {
-        // 1. Initialize ViewModel (triggers loadLevelsWithProgress)
+        // 1. Initialize ViewModel (Lightweight)
         let viewModel = await LevelViewModel()
+        XCTAssertFalse(await viewModel.appIsReady)
         
-        // 2. Poll for loading completion
-        var timeout = 5.0
-        while await viewModel.isLoading && timeout > 0 {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
-            timeout -= 0.1
-        }
+        // 2. Trigger background load
+        await viewModel.loadLevelsData()
         
-        // 3. Verify Final State
-        let isDone = await viewModel.isLoading == false
-        XCTAssertTrue(isDone, "Loading should complete within timeout")
-        
+        // 3. Verify Data
         let hasLevels = await !viewModel.levels.isEmpty
         XCTAssertTrue(hasLevels, "Levels should be populated")
         
-        let progress = await viewModel.loadingProgress
-        XCTAssertEqual(progress, 1.0, "Progress should be 100%")
+        // Note: appIsReady is controlled by SplashView in the app, 
+        // so we don't assert it here unless we simulate the SplashView logic.
     }
     
     func testGetLevelBoundsSafety() {

@@ -73,17 +73,16 @@ struct SudokuiOSApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                if levelViewModel.isLoading {
-                    SplashView(isActive: .constant(true))
-                        .environmentObject(levelViewModel)
-                        .transition(.opacity)
-                } else {
+                if levelViewModel.appIsReady {
                     MainMenuView()
                         .environmentObject(levelViewModel)
                         .transition(.opacity)
+                } else {
+                    SplashView(isActive: .constant(true))
+                        .environmentObject(levelViewModel)
                 }
             }
-            .animation(.easeInOut(duration: 0.5), value: levelViewModel.isLoading)
+            .animation(.easeInOut(duration: 0.5), value: levelViewModel.appIsReady)
             .environment(appSettings) // Inject AppSettings
             .preferredColorScheme(appSettings?.appTheme.colorScheme) // Adaptive Theme
             .modelContainer(container) // Inject for @Query if needed later

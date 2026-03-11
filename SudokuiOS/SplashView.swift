@@ -8,8 +8,9 @@ struct SplashView: View {
     @State private var titleOffset: CGFloat = 20
     @State private var subtitleColors: [Color] = [.gray, .gray, .gray, .gray, .gray] // Initially hidden/gray
     @State private var subtitleOpacities: [Double] = [0, 0, 0, 0, 0]
+    @State private var progress: CGFloat = 0.0
     
-    // Binding to toggle Main Menu
+    // Binding to toggle Main Menu (Keep for compatibility if used by other views, but we use appIsReady)
     @Binding var isActive: Bool
     
     @Environment(\.colorScheme) var colorScheme
@@ -61,7 +62,7 @@ struct SplashView: View {
                             
                             Capsule()
                                 .fill(getSubtitleColor())
-                                .frame(width: 200 * levelViewModel.loadingProgress, height: 6)
+                                .frame(width: 200 * progress, height: 6)
                         }
                         
                         Text("Loading Levels...")
@@ -72,6 +73,27 @@ struct SplashView: View {
                     .opacity(titleOpacity) // Sync with title fade-in
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity) // Center content
+            }
+        }
+        .task {
+            // 1. Start a slow animation simulating a 15-second max load (up to 90%)
+            withAnimation(.linear(duration: 15.0)) {
+                progress = 0.90
+            }
+
+            // 2. Await the actual heavy background parsing
+            await levelViewModel.loadLevelsData()
+
+            // 3. Once data is loaded, override the animation to quickly zip to 100%
+            withAnimation(.easeOut(duration: 0.5)) {
+                progress = 1.0
+            }
+
+            // 4. Wait for the zip animation to finish, then transition
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            
+            withAnimation(.easeInOut(duration: 0.5)) {
+                levelViewModel.appIsReady = true
             }
         }
         .onAppear {

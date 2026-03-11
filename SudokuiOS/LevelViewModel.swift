@@ -228,8 +228,7 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
 class LevelViewModel: ObservableObject {
     @Published var levels: [SudokuLevel] = []
     @Published var customLevels: [CustomSudokuLevel] = []
-    @Published var isLoading: Bool = true
-    @Published var loadingProgress: CGFloat = 0.0
+    @Published var appIsReady: Bool = false
     private var hasLoadedLevels = false
  // New array for Custom Levels
     
@@ -283,44 +282,69 @@ class LevelViewModel: ObservableObject {
     
     init(modelContext: ModelContext? = nil) {
         self.modelContext = modelContext
-        loadLevelsWithProgress()
     }
     
-    private func loadLevelsWithProgress() {
-        Task {
-            // 1. Start smooth progress simulation (0 -> 0.85)
-            withAnimation(.linear(duration: 0.5)) {
-                loadingProgress = 0.85
+    /// Dedicated background loader triggered by SplashView.task
+    func loadLevelsData() async {
+        guard let context = modelContext else { return }
+        
+        // 1. Offload heavy parsing & data merging to background thread
+        // This eradicates N+1 queries by fetching into a Dictionary once.
+        let finalLevels = await Task.detached(priority: .userInitiated) {
+            // A. Load raw JSON (O(1) file read)
+            var localLevels = LevelViewModel.loadBundledLevels()
+            guard !localLevels.isEmpty else { return localLevels }
+            
+            // B. Fetch all progress records in ONE query (Eradicates N+1)
+            let descriptor = FetchDescriptor<UserLevelProgress>()
+            let progressList = (try? context.fetch(descriptor)) ?? []
+            let progressMap = Dictionary(uniqueKeysWithValues: progressList.map { ($0.levelID, $0) })
+            
+            // C. Fetch unlocked IDs from UserDefaults
+            let unlockedIDs = Set(UserDefaults.standard.array(forKey: "com.sudokuios.unlockedLevels") as? [Int] ?? [])
+            let hasRemovedAds = UserDefaults.standard.bool(forKey: "isAdsRemoved")
+            let debugUnlock = UserDefaults.standard.bool(forKey: "devAllUnlocked")
+
+            // D. Map everything in O(N) using the O(1) Dictionary
+            for i in 0..<localLevels.count {
+                let id = localLevels[i].id
+                
+                // Set Progress
+                if let progress = progressMap[id] {
+                    localLevels[i].isSolved = progress.isSolved
+                    localLevels[i].userProgress = progress.currentUserBoard
+                    localLevels[i].notesData = progress.notesData
+                    localLevels[i].colorData = progress.colorData
+                    localLevels[i].markedCombinationsData = progress.markedCombinationsData
+                    localLevels[i].killerMarkedCombinationsData = progress.killerMarkedCombinationsData
+                    localLevels[i].crossData = progress.crossData
+                    localLevels[i].timeElapsed = progress.timeElapsed
+                    localLevels[i].bestTime = progress.bestTime
+                    localLevels[i].lastSolvedTime = (progress.lastSolvedTime == 0 && progress.isSolved) ? progress.bestTime : progress.lastSolvedTime
+                    localLevels[i].isPerfect = progress.isPerfect
+                    localLevels[i].mistakesMade = progress.mistakesMade
+                    localLevels[i].isAdUnlocked = progress.isAdUnlocked
+                    localLevels[i].isUnlocked = progress.isUnlocked
+                }
+                
+                // Mix in UserDefaults Unlocks
+                if unlockedIDs.contains(id) {
+                    localLevels[i].isUnlocked = true
+                }
             }
             
-            // 2. Parse Levels.json in background
-            let loadedLevels = await Task.detached(priority: .userInitiated) {
-                return LevelViewModel.loadBundledLevels()
-            }.value
+            // E. Calculate Locks in memory (Eradicates 600 UI updates)
+            LevelViewModel.recalculateLocks(for: &localLevels, hasRemovedAds: hasRemovedAds, debugUnlock: debugUnlock)
             
-            // 3. Finalize
-            self.levels = loadedLevels
-            self.hasLoadedLevels = true
-            
-            // Apply persistent state
-            if modelContext != nil {
-                loadProgressFromSwiftData()
-            }
-            loadUnlockedLevelsFromUserDefaults()
-            
-            // 4. Smoothly hit 100%
-            withAnimation(.easeOut(duration: 0.3)) {
-                loadingProgress = 1.0
-            }
-            
-            // 5. Tiny delay for visual confirmation
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            
-            withAnimation(.easeInOut(duration: 0.4)) {
-                self.isLoading = false
-            }
-        }
+            return localLevels
+        }.value
+        
+        // 2. Safely update UI-bound array on MainActor EXACTLY ONCE
+        self.levels = finalLevels
+        self.hasLoadedLevels = true
     }
+    
+    // Removing old logic to prevent ambiguity
     
     /// Ensures levels are loaded from JSON exactly once.
     func ensureLevelsLoaded() {
@@ -358,8 +382,8 @@ class LevelViewModel: ObservableObject {
     
     func updateContext(_ context: ModelContext) {
         self.modelContext = context
-        loadProgressFromSwiftData()
-        loadUnlockedLevelsFromUserDefaults() // Ensure UD unlocks are applied
+        // We no longer trigger sync loads here to prevent blocking.
+        // The SplashView.task will handle the async load.
     }
     
     func getLevel(by id: Int) -> SudokuLevel? {
@@ -375,51 +399,36 @@ class LevelViewModel: ObservableObject {
     func loadProgressFromSwiftData() {
         guard let context = modelContext else { return }
         
-        // Fetch all progress records
-        // Query optimization: fetch all is fine for 600 items. User requested:
-        // "fetch only the levelID and isSolved status for all 600 levels to render the grid icons quickly"
-        // We fetch the entities.
+        // fetch all progress records
         let descriptor = FetchDescriptor<UserLevelProgress>()
         
         do {
             let progressList = try context.fetch(descriptor)
+            let progressMap = Dictionary(uniqueKeysWithValues: progressList.map { ($0.levelID, $0) })
             
-            // Map to existing levels array
-            for progress in progressList {
-                if let index = levels.firstIndex(where: { $0.id == progress.levelID }) {
-                    levels[index].isSolved = progress.isSolved
-                    
-                    // Optimization: Only load current board if needed?
-                    // User said: "Ensure the app only loads the UserLevelProgress data for the currently active level to save memory"
-                    // However, UserLevelProgress is the entity. If we fetch it, we have it.
-                    // But we can map "currentUserBoard" to the transient "userProgress" field ONLY if explicitly needed.
-                    // But for simplicity and correctness of "isSolved" state, we update that.
-                    // We will NOT set `userProgress` (the board string) here excessively if not needed,
-                    // BUT previous requirement "Resume Logic" said "When user re-opens... load original pattern."
-                    // which implied checking userProgress.
-                    // For now, let's load it if present, to maintain feature parity with previous implementation.
-                    levels[index].userProgress = progress.currentUserBoard
-                    levels[index].notesData = progress.notesData
-                    levels[index].colorData = progress.colorData
-                    levels[index].markedCombinationsData = progress.markedCombinationsData
-                    levels[index].killerMarkedCombinationsData = progress.killerMarkedCombinationsData
-                    levels[index].crossData = progress.crossData
-                    levels[index].timeElapsed = progress.timeElapsed
-                    levels[index].bestTime = progress.bestTime
-                    // Fallback for legacy solved levels: use bestTime as lastSolvedTime if it's missing
-                    levels[index].lastSolvedTime = (progress.lastSolvedTime == 0 && progress.isSolved) ? progress.bestTime : progress.lastSolvedTime
-                    levels[index].isPerfect = progress.isPerfect
-                    levels[index].mistakesMade = progress.mistakesMade
-                    levels[index].isAdUnlocked = progress.isAdUnlocked
-                    levels[index].isUnlocked = progress.isUnlocked // Persistent Sticky Unlock
+            // Map to existing levels array (local buffer to avoid 600 updates)
+            var updatedLevels = self.levels
+            for i in 0..<updatedLevels.count {
+                let id = updatedLevels[i].id
+                if let progress = progressMap[id] {
+                    updatedLevels[i].isSolved = progress.isSolved
+                    updatedLevels[i].userProgress = progress.currentUserBoard
+                    updatedLevels[i].notesData = progress.notesData
+                    updatedLevels[i].colorData = progress.colorData
+                    updatedLevels[i].markedCombinationsData = progress.markedCombinationsData
+                    updatedLevels[i].killerMarkedCombinationsData = progress.killerMarkedCombinationsData
+                    updatedLevels[i].crossData = progress.crossData
+                    updatedLevels[i].timeElapsed = progress.timeElapsed
+                    updatedLevels[i].bestTime = progress.bestTime
+                    updatedLevels[i].lastSolvedTime = (progress.lastSolvedTime == 0 && progress.isSolved) ? progress.bestTime : progress.lastSolvedTime
+                    updatedLevels[i].isPerfect = progress.isPerfect
+                    updatedLevels[i].mistakesMade = progress.mistakesMade
+                    updatedLevels[i].isAdUnlocked = progress.isAdUnlocked
+                    updatedLevels[i].isUnlocked = progress.isUnlocked
                 }
             }
-            
+            self.levels = updatedLevels
             refreshLocks()
-            
-            // --- Cloud Sync Integration ---
-            // syncWithCloud()
-            
         } catch {
             print("Failed to fetch SwiftData progress: \(error)")
         }
@@ -672,16 +681,15 @@ class LevelViewModel: ObservableObject {
     // MARK: - Game Logic
     
     private func refreshLocks() {
-        // Core Locking Logic:
-        // 1. Levels 1-250: Sequential Unlock, Ads allow gaps.
-        // 2. Levels 251-600: Strictly locked until 1-250 are ALL solved.
-        
-        let hasRemovedAds = UserDefaults.standard.bool(forKey: "isAdsRemoved") // Check IAP
+        let hasRemovedAds = UserDefaults.standard.bool(forKey: "isAdsRemoved")
         let debugUnlock = UserDefaults.standard.bool(forKey: "devAllUnlocked")
         
-        // Check Barrier (1-250 Solved?)
-        // Optimization: We rely on `isSolved` being up to date.
-        // Note: Array is 0-indexed, ID is 1-indexed. id=250 is index 249.
+        var localLevels = self.levels
+        LevelViewModel.recalculateLocks(for: &localLevels, hasRemovedAds: hasRemovedAds, debugUnlock: debugUnlock)
+        self.levels = localLevels
+    }
+    
+    private nonisolated static func recalculateLocks(for levels: inout [SudokuLevel], hasRemovedAds: Bool, debugUnlock: Bool) {
         let endOfFirstSection = min(250, levels.count)
         let firstSectionSolved = levels[0..<endOfFirstSection].allSatisfy { $0.isSolved }
         
@@ -691,7 +699,6 @@ class LevelViewModel: ObservableObject {
         let naturalUnlockID = (firstUnsolvedIndex != nil) ? levels[firstUnsolvedIndex!].id : Int.max
         
         for i in 0..<levels.count {
-            // Debug Override: Unlock everything purely visually/access-wise
             if debugUnlock {
                 levels[i].isLocked = false
                 continue
@@ -718,8 +725,8 @@ class LevelViewModel: ObservableObject {
                     levels[i].isLocked = false
                 } else if levelID == naturalUnlockID {
                     levels[i].isLocked = false
-                    // Sticky: Persist immediately if natural progression reached it
-                    unlockLevel(levelID)
+                    // NOTE: Removed iterative persistent save here. 
+                    // Unlocks should be saved on solve or explicitly.
                 } else {
                     levels[i].isLocked = true
                 }
@@ -734,13 +741,9 @@ class LevelViewModel: ObservableObject {
                     if hasRemovedAds || isUserUnlocked {
                          levels[i].isLocked = false
                     } else if levelID == 251 {
-                        // Special Case: Gate just opened, so 251 is the "next" level
                         levels[i].isLocked = false
-                        unlockLevel(levelID)
                     } else if levelID == naturalUnlockID {
                         levels[i].isLocked = false
-                        // Sticky: Persist immediately
-                        unlockLevel(levelID)
                     } else {
                          levels[i].isLocked = true
                     }
@@ -861,12 +864,16 @@ class LevelViewModel: ObservableObject {
     }
     
     private func loadUnlockedLevelsFromUserDefaults() {
-        let unlockedIDs = UserDefaults.standard.array(forKey: kUnlockedLevelsKey) as? [Int] ?? []
-        for id in unlockedIDs {
-            if let index = levels.firstIndex(where: { $0.id == id }) {
-                levels[index].isUnlocked = true
+        let unlockedIDs = Set(UserDefaults.standard.array(forKey: kUnlockedLevelsKey) as? [Int] ?? [])
+        guard !unlockedIDs.isEmpty else { return }
+        
+        var updatedLevels = self.levels
+        for i in 0..<updatedLevels.count {
+            if unlockedIDs.contains(updatedLevels[i].id) {
+                updatedLevels[i].isUnlocked = true
             }
         }
+        self.levels = updatedLevels
         refreshLocks()
     }
     
