@@ -140,7 +140,8 @@ struct LevelPreviewBoard: View {
                                     isClue: isClue,
                                     isError: false, // Preview has no errors
                                     hasCross: hasCross,
-                                    cellSize: cellSize
+                                    cellSize: cellSize,
+                                    isKiller: level.cages != nil && !level.cages!.isEmpty
                                 )
                                 .frame(height: cellSize)
                             }

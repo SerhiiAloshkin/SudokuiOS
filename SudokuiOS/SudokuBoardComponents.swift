@@ -9,6 +9,7 @@ struct PreviewSudokuCellView: View {
     let isError: Bool
     let hasCross: Bool
     let cellSize: CGFloat
+    let isKiller: Bool
     
     // Static Palette for preview if needed, or pass color directly
     // Using standard colors
@@ -51,7 +52,7 @@ struct PreviewSudokuCellView: View {
                         let num = r * 3 + c + 1
                         if notes.contains(num) {
                             Text("\(num)")
-                                .font(.system(size: max(9, cellSize * 0.28), weight: .regular, design: .rounded))
+                                .font(.system(size: max(isKiller ? 8 : 9, cellSize * (isKiller ? 0.18 : 0.28)), weight: .regular, design: .rounded))
                                 .minimumScaleFactor(0.6)
                                 .foregroundColor(.primary)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -63,6 +64,8 @@ struct PreviewSudokuCellView: View {
                 }
             }
         }
+        .padding(.top, isKiller ? cellSize * 0.12 : 0)
+        .padding(.leading, isKiller ? cellSize * 0.12 : 0)
         .padding(2) 
     }
 }

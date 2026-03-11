@@ -337,7 +337,7 @@ struct SudokuGameView: View {
                             let num = r * 3 + c + 1
                             if cell.notes.contains(num) {
                                 Text("\(num)")
-                                    .font(.system(size: max(9, cellSize * 0.28), weight: .regular, design: .rounded))
+                                    .font(.system(size: max(isKiller ? 8 : 9, cellSize * (isKiller ? 0.18 : 0.28)), weight: .regular, design: .rounded))
                                     .minimumScaleFactor(0.6)
                                     .foregroundColor(.primary)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -349,7 +349,9 @@ struct SudokuGameView: View {
                     }
                 }
             }
-            .padding(isKiller ? 4 : 2) // Adjusted padding for better fit
+            .padding(.top, isKiller ? cellSize * 0.12 : 0)
+            .padding(.leading, isKiller ? cellSize * 0.12 : 0)
+            .padding(isKiller ? 2 : 2) // Reduced overall padding for Killer to compensate for specific shift
         }
     }
     
