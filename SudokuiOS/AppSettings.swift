@@ -118,7 +118,6 @@ final class AppSettings {
         }
     }
     
-    var appThemeRaw: String = "light"
     var appTheme: AppTheme {
         get { AppTheme(rawValue: appThemeRaw) ?? .light }
         set { appThemeRaw = newValue.rawValue }
