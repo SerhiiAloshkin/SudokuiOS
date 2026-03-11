@@ -141,6 +141,7 @@ class LevelBuilderViewModel: ObservableObject {
     
     private func hydrateFrom(_ level: CustomSudokuLevel) {
         editingLevelID = level.id
+        pendingLevelName = level.levelName
         
         // Board digits
         let boardChars = Array(level.board)
@@ -495,18 +496,42 @@ class LevelBuilderViewModel: ObservableObject {
             name = "Level \(existingCount + 1)"
         }
         
-        let customLevel = buildCustomLevel(name: name)
-        
-        // If editing, delete old version first
+        // If editing, update existing version
         if let existingID = editingLevelID {
             let descriptor = FetchDescriptor<CustomSudokuLevel>(
                 predicate: #Predicate { $0.id == existingID }
             )
             if let existing = try? context.fetch(descriptor).first {
-                context.delete(existing)
+                let updated = buildCustomLevel(name: name)
+                
+                // Manually sync properties to the existing SwiftData object
+                existing.levelName = updated.levelName
+                existing.board = updated.board
+                existing.ruleType = updated.ruleType
+                existing.isNonConsecutive = updated.isNonConsecutive
+                existing.isKing = updated.isKing
+                existing.isKnight = updated.isKnight
+                existing.thermoPathsData = updated.thermoPathsData
+                existing.arrowsData = updated.arrowsData
+                existing.cagesData = updated.cagesData
+                existing.whiteDotsData = updated.whiteDotsData
+                existing.blackDotsData = updated.blackDotsData
+                existing.parityData = updated.parityData
+                existing.sandwichRowCluesData = updated.sandwichRowCluesData
+                existing.sandwichColCluesData = updated.sandwichColCluesData
+                
+                do {
+                    try context.save()
+                    self.validationResult = "Updated successfully!"
+                    return
+                } catch {
+                    self.validationResult = "Failed to update: \(error.localizedDescription)"
+                    return
+                }
             }
         }
         
+        let customLevel = buildCustomLevel(name: name)
         context.insert(customLevel)
         do {
             try context.save()
