@@ -134,7 +134,7 @@ struct SettingsView: View {
                                         Text(product.displayPrice)
                                             .foregroundColor(.secondary)
                                     } else {
-                                        Text("$2.99")
+                                        Text("$4.99")
                                             .foregroundColor(.secondary)
                                     }
                                 }
