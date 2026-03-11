@@ -1,61 +1,51 @@
 import SwiftUI
 
-
-
-struct PrimaryButtonStyle: ButtonStyle {
+struct PrimaryVersaButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .fontWeight(.bold)
+            .font(.title3.bold())
             .foregroundColor(.white)
-            .padding()
+            .padding(.vertical, 16)
             .frame(maxWidth: .infinity)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [Color.blue, Color.cyan]), // Subtle gradient
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .cornerRadius(12)
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .shadow(color: Color.blue.opacity(0.3), radius: 5, x: 0, y: 3)
-            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
+            .background(Color.themeBlue)
+            .cornerRadius(16)
+            .shadow(color: Color.themeBlue.opacity(0.3), radius: 8, x: 0, y: 4)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.interactiveSpring(), value: configuration.isPressed)
     }
 }
 
-struct SecondaryButtonStyle: ButtonStyle {
+struct SecondaryVersaButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .fontWeight(.bold)
-            .foregroundColor(.primary)
-            .padding()
+            .font(.headline.bold())
+            .foregroundColor(.themeBlue)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity)
-            .background(Color(uiColor: .systemBackground)) // Transparent/Background
-            .cornerRadius(12)
+            .background(.ultraThinMaterial)
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.gray.opacity(0.5), lineWidth: 2)
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.themeBlue.opacity(0.2), lineWidth: 1)
             )
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.interactiveSpring(), value: configuration.isPressed)
     }
 }
-struct VersaButtonStyle: ButtonStyle {
-    var isEnabled: Bool = true
+
+struct UtilityVersaButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .bold, design: .rounded))
-            .foregroundColor(isEnabled ? .primary : .gray.opacity(0.5))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isEnabled ? Color(hex: "#B8F2E6") : Color.gray.opacity(0.1))
-                    .shadow(color: Color.black.opacity(isEnabled ? 0.1 : 0), radius: 2, x: 0, y: 1)
+            .font(.title2)
+            .foregroundColor(.themeBlue)
+            .frame(width: 56, height: 56)
+            .background(.ultraThinMaterial)
+            .clipShape(Circle())
+            .overlay(
+                Circle()
+                    .stroke(Color.themeBlue.opacity(0.2), lineWidth: 1)
             )
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.interactiveSpring(), value: configuration.isPressed)
     }
 }

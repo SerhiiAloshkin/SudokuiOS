@@ -47,12 +47,11 @@ struct MainMenuView: View {
                         // Weighted Spacer (Push content up)
                         Spacer()
                         
-                        // Button Stack (Upper Two-Thirds)
+                        // Button Stack (Center Area)
                         if showButtons {
-                            VStack(spacing: 20) {
-                                // 1. Continue Level (Dynamic Card)
+                            VStack(spacing: 24) {
+                                // 1. Continue Level (Primary Card)
                                 if let session = activeSession ?? legacySession() {
-                                    // Determine if it's a custom level or standard level
                                     let isCustom = session.isCustomLevel
                                     
                                     if isCustom {
@@ -87,74 +86,68 @@ struct MainMenuView: View {
                                         .buttonStyle(.plain)
                                     }
                                 }
-                                // 2. Select Level (Primary Action)
+                                
+                                // 2. Play Campaign (Primary)
                                 Button(action: {
                                     navigationPath.append(.levelSelection)
                                 }) {
                                     HStack {
-                                        Image(systemName: "square.grid.2x2.fill")
-                                        Text("Select Level")
+                                        Image(systemName: "play.fill")
+                                        Text("Play Campaign")
                                     }
                                 }
-                                .buttonStyle(PrimaryButtonStyle())
+                                .buttonStyle(PrimaryVersaButtonStyle())
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                                 
-                                // 2.5 Level Builder (Primary Action)
-                                Button(action: {
-                                    navigationPath.append(.levelBuilder)
-                                }) {
-                                    HStack {
-                                        Image(systemName: "hammer.fill")
-                                        Text("Level Builder")
+                                // 3. Secondary Actions
+                                VStack(spacing: 12) {
+                                    Button(action: {
+                                        navigationPath.append(.levelBuilder)
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "hammer.fill")
+                                            Text("Level Builder")
+                                        }
                                     }
-                                }
-                                .buttonStyle(PrimaryButtonStyle())
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                                
-                                // 2.6 My Levels
-                                Button(action: {
-                                    navigationPath.append(.customLevels)
-                                }) {
-                                    HStack {
-                                        Image(systemName: "tray.full.fill")
-                                        Text("My Levels")
+                                    .buttonStyle(SecondaryVersaButtonStyle())
+                                    
+                                    Button(action: {
+                                        navigationPath.append(.customLevels)
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "tray.full.fill")
+                                            Text("My Custom Levels")
+                                        }
                                     }
+                                    .buttonStyle(SecondaryVersaButtonStyle())
                                 }
-                                .buttonStyle(SecondaryButtonStyle())
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                                
-                                .buttonStyle(SecondaryButtonStyle())
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                                
-                                // 2.7 How to Play
+                            }
+                            .padding(.horizontal, 40)
+                        }
+                        
+                        Spacer()
+                        
+                        // Bottom Utility Bar
+                        if showButtons {
+                            HStack(spacing: 40) {
                                 Button(action: {
                                     navigationPath.append(.howToPlay)
                                 }) {
-                                    HStack {
-                                        Image(systemName: "questionmark.circle")
-                                        Text("How to Play")
-                                    }
+                                    Image(systemName: "book.fill")
                                 }
-                                .buttonStyle(SecondaryButtonStyle())
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                                .buttonStyle(UtilityVersaButtonStyle())
                                 
-                                // 3. Settings (Secondary Action)
                                 Button(action: {
                                     showSettings = true
                                 }) {
-                                    HStack {
-                                        Image(systemName: "gearshape")
-                                        Text("Settings")
-                                    }
+                                    Image(systemName: "gearshape.fill")
                                 }
-                                .buttonStyle(SecondaryButtonStyle())
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                                .buttonStyle(UtilityVersaButtonStyle())
                             }
-                            .padding(.horizontal, 30)
+                            .padding(.bottom, 40)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
-                        
-                        // Push Ad to Bottom (Removed)
-                        Spacer()
                     }
                 }
             }
