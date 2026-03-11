@@ -146,6 +146,7 @@ struct LevelPreviewBoard: View {
                                 .frame(height: cellSize)
                             }
                         }
+                        .drawingGroup()
                         
                         // 8. Board Overlay (Lines)
                         SudokuBoardOverlay()

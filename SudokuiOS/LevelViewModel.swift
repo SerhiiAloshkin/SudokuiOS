@@ -226,7 +226,9 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
 @MainActor
 class LevelViewModel: ObservableObject {
     @Published var levels: [SudokuLevel] = []
-    @Published var customLevels: [CustomSudokuLevel] = [] // New array for Custom Levels
+    @Published var customLevels: [CustomSudokuLevel] = []
+    @Published var isLoading: Bool = true
+ // New array for Custom Levels
     
     
     // Dependencies
@@ -277,23 +279,34 @@ class LevelViewModel: ObservableObject {
     init(modelContext: ModelContext? = nil) {
         self.modelContext = modelContext
         
-        // 1. Generate default 600 levels (Runtime state)
+        // 1. Generate default 600 empty structures (Runtime state)
+        // This remains synchronous and fast
         var tempLevels: [SudokuLevel] = []
         for i in 1...600 {
-            // Default lock logic: All levels unlocked temporarily per user request
-            let isLocked = false // i > 10
-            let level = SudokuLevel(id: i, isLocked: isLocked, isSolved: false)
-            tempLevels.append(level)
+            let item = SudokuLevel(id: i, isLocked: false, isSolved: false)
+            tempLevels.append(item)
         }
         self.levels = tempLevels
         
-        // 2. Overlay Persistent JSON Data (Static)
-        loadLevelsFromJSON()
+        // 2. Load heavy data asynchronously
+        Task {
+            await loadLevelsAsync()
+        }
+    }
+    
+    private func loadLevelsAsync() async {
+        // Overlay Persistent JSON Data (Static) - Moved to background
+        await loadLevelsFromJSON()
         
-        // 3. Overlay SwiftData Progress (Dynamic)
+        // Overlay SwiftData Progress (Dynamic)
         if modelContext != nil {
             loadProgressFromSwiftData()
         }
+        
+        // Tiny sleep for smooth transition as requested
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+        
+        self.isLoading = false
     }
     
     func updateContext(_ context: ModelContext) {
@@ -302,7 +315,7 @@ class LevelViewModel: ObservableObject {
         loadUnlockedLevelsFromUserDefaults() // Ensure UD unlocks are applied
     }
     
-    func loadLevelsFromJSON() {
+    func loadLevelsFromJSON() async {
         // Try to find the bundle containing the resource
         var bundle: Bundle = .main
         #if SWIFT_PACKAGE
@@ -312,27 +325,32 @@ class LevelViewModel: ObservableObject {
         guard let url = bundle.url(forResource: "Levels", withExtension: "json") else {
             // Fallback
             if bundle != .main, let mainUrl = Bundle.main.url(forResource: "Levels", withExtension: "json") {
-                 do { try loadData(from: mainUrl) } catch { print("Fallback load failed: \(error)") }
+                 do { try await loadData(from: mainUrl) } catch { print("Fallback load failed: \(error)") }
                  return
             }
             print("Levels.json not found in bundle")
             return
         }
         
-        do { try loadData(from: url) } catch { print("Failed to load levels: \(error)") }
+        do { try await loadData(from: url) } catch { print("Failed to load levels: \(error)") }
     }
     
-    private func loadData(from url: URL) throws {
-        let data = try Data(contentsOf: url)
-        let decoder = JSONDecoder()
-        let loadedLevels = try decoder.decode([SudokuLevel].self, from: data)
+    private func loadData(from url: URL) async throws {
+        // Offload reading and decoding to a background thread
+        let loadedLevels = try await Task.detached(priority: .userInitiated) {
+            let data = try Data(contentsOf: url)
+            let decoder = JSONDecoder()
+            return try decoder.decode([SudokuLevel].self, from: data)
+        }.value
+        
+        // Back on @MainActor (inherent from class), apply to levels
         for loadedLevel in loadedLevels {
             if let index = levels.firstIndex(where: { $0.id == loadedLevel.id }) {
                 levels[index].board = loadedLevel.board
                 levels[index].solution = loadedLevel.solution
                 levels[index].difficulty = loadedLevel.difficulty
                 levels[index].ruleType = loadedLevel.ruleType
-                levels[index].types = loadedLevel.types // Update new field
+                levels[index].types = loadedLevel.types
                 levels[index].rowClues = loadedLevel.rowClues
                 levels[index].colClues = loadedLevel.colClues
                 levels[index].thermoPaths = loadedLevel.thermoPaths

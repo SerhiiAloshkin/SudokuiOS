@@ -301,6 +301,7 @@ struct LevelBuilderView: View {
                 builderCell(cell: cell, cellSize: cellSize)
             }
         }
+        .drawingGroup()
         .border(Color.primary, width: 2)
         .background(Color(uiColor: .systemBackground))
     }

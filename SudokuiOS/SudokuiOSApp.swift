@@ -14,8 +14,7 @@ struct SudokuiOSApp: App {
     @State private var appSettings: AppSettings?
     @Environment(\.scenePhase) private var scenePhase
     
-    // Splash Screen State
-    @State private var isSplashActive = true
+    // Splash Screen State handled by LevelViewModel.isLoading
     
     init() {
         do {
@@ -73,11 +72,13 @@ struct SudokuiOSApp: App {
     
     var body: some Scene {
         WindowGroup {
-            Group {
-                if isSplashActive {
-                    SplashView(isActive: $isSplashActive)
+            ZStack {
+                if levelViewModel.isLoading {
+                    SplashView(isActive: .constant(true))
+                        .transition(.opacity.animation(.easeInOut(duration: 0.5)))
                 } else {
                     MainMenuView()
+                        .transition(.opacity.animation(.easeInOut(duration: 0.5)))
                 }
             }
             .environmentObject(levelViewModel)

@@ -110,12 +110,7 @@ extension SplashView {
             }
         }
         
-        // 2.5s: Complete & Transition
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            withAnimation(.easeOut(duration: 0.5)) { // Plain fade out (transition handles cross dissolve if configured)
-                isActive = false
-            }
-        }
+        /* Transition is now handled by levelViewModel.isLoading in SudokuiOSApp */
     }
 }
 

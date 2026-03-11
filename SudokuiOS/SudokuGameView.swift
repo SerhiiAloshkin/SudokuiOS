@@ -1022,6 +1022,7 @@ struct SudokuGameView: View {
                                     }
                                 }
                             }
+                            .drawingGroup()
                             .padding(.horizontal, cardPadding) // Align with grid columns inside card
                             .padding(.bottom, 4) // Gap between clues and card
                         }
@@ -1049,6 +1050,7 @@ struct SudokuGameView: View {
                                 }
                             }
                             .id(gameViewModel.boardID)
+                            .drawingGroup()
                             .zIndex(1)
                             
                             // 2. Lines & Overlays Layer
@@ -1096,6 +1098,7 @@ struct SudokuGameView: View {
                                 }
                             }
                             .id("\(gameViewModel.boardID)-cross")
+                            .drawingGroup()
                             .zIndex(3)
                             
                             // 4. Content (Notes & Numbers) Layer
