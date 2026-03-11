@@ -113,6 +113,7 @@ class SudokuGameViewModel: ObservableObject {
              pointPairRestrictions = PotentialHighlightCalculator.calculatePotentials(
                 board: currentBoardArray,
                 digit: digit,
+                rules: rules,
                 isValid: { [weak self] d, i in
                     self?.isPlacementValid(d, at: i) ?? false
                 }
@@ -1841,6 +1842,7 @@ class SudokuGameViewModel: ObservableObject {
             restrictedHighlightSet = PotentialHighlightCalculator.calculatePotentials(
                 board: currentBoardArray,
                 digit: digit,
+                rules: rules,
                 isValid: { [weak self] d, i in
                     self?.isPlacementValid(d, at: i) ?? false
                 }

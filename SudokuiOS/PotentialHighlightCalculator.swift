@@ -7,6 +7,7 @@ struct PotentialHighlightCalculator {
     static func calculatePotentials(
         board: [Int],
         digit: Int,
+        rules: [SudokuRuleType],
         isValid: (Int, Int) -> Bool // (digit, index) -> Bool
     ) -> Set<Int> {
         guard digit >= 1, digit <= 9 else { return [] }
@@ -86,6 +87,35 @@ struct PotentialHighlightCalculator {
                 }
             }
             
+            // Rule 4: Generic Pointing Elimination (Common Attacked Cells)
+            // This generalizes pointing/claiming to include variant rules (King, Knight, etc.)
+            let houses = (0..<9).map { getBoxIndices($0) } + 
+                         (0..<9).map { getRowIndices($0) } + 
+                         (0..<9).map { getColIndices($0) }
+            
+            for houseIndices in houses {
+                let potentialsInHouse = potentials.intersection(houseIndices)
+                guard !potentialsInHouse.isEmpty else { continue }
+                
+                var commonAttacked: Set<Int>? = nil
+                for cell in potentialsInHouse {
+                    let attacked = getAttackedCells(for: cell, rules: rules)
+                    if commonAttacked == nil {
+                        commonAttacked = attacked
+                    } else {
+                        commonAttacked?.formIntersection(attacked)
+                    }
+                }
+                
+                if let toPrune = commonAttacked {
+                    // Only prune cells that don't already have something (avoiding placed numbers)
+                    // and are actually in the potential set
+                    let before = potentials.count
+                    potentials.subtract(toPrune)
+                    if potentials.count != before { changed = true }
+                }
+            }
+            
             if potentials.count == countBefore { changed = false }
             passes += 1
         }
@@ -108,6 +138,7 @@ struct PotentialHighlightCalculator {
                 
                 let boxPotentialIndices = potentials.intersection(boxMap[boxToWatchIndex])
                 let remainingInBox = boxPotentialIndices.filter { idx in
+                    // Basic classic checks (General Pointing might already have pruned some of these)
                     (idx / 9 != row) && (idx % 9 != col)
                 }
                 
@@ -124,6 +155,56 @@ struct PotentialHighlightCalculator {
         
         // Restricted indices are those that were initially valid but were pruned
         return basePotentials.subtracting(finalPotentials)
+    }
+    
+    // MARK: - Helpers
+    
+    private static func getAttackedCells(for index: Int, rules: [SudokuRuleType]) -> Set<Int> {
+        let r = index / 9
+        let c = index % 9
+        let box = (r / 3) * 3 + (c / 3)
+        
+        var attacked = Set<Int>()
+        
+        // Classic Row, Col, Box
+        for i in 0..<81 {
+            let row = i / 9
+            let col = i % 9
+            let b = (row / 3) * 3 + (col / 3)
+            if row == r || col == c || b == box {
+                if i != index {
+                    attacked.insert(i)
+                }
+            }
+        }
+        
+        // Knight Moves
+        if rules.contains(.knight) {
+            let knightOffsets = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
+            for offset in knightOffsets {
+                let nr = r + offset.0
+                let nc = c + offset.1
+                if nr >= 0 && nr < 9 && nc >= 0 && nc < 9 {
+                    attacked.insert(nr * 9 + nc)
+                }
+            }
+        }
+        
+        // King Moves (Adjacent including diagonals)
+        if rules.contains(.king) {
+            for dr in -1...1 {
+                for dc in -1...1 {
+                    if dr == 0 && dc == 0 { continue }
+                    let nr = r + dr
+                    let nc = c + dc
+                    if nr >= 0 && nr < 9 && nc >= 0 && nc < 9 {
+                        attacked.insert(nr * 9 + nc)
+                    }
+                }
+            }
+        }
+        
+        return attacked
     }
     
     // MARK: - Helpers
