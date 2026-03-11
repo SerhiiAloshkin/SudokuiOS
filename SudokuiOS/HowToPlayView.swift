@@ -136,48 +136,76 @@ private struct BuilderSection: View {
 private struct SettingsSection: View {
     var body: some View {
         EncyclopediaCard(title: "Game Settings", icon: "gearshape.fill") {
-            EncyclopediaItem(icon: "paintbrush.fill", title: "Theme", description: "Choose between Light or Dark mode, or select 'System' to follow your device's appearance settings.")
-            
-            Divider().padding(.vertical, 4)
-            
-            Group {
-                Text("Highlight Mode")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.themeBlue)
+            VStack(alignment: .leading, spacing: 16) {
+                // MARK: Highlight Mode
+                Group {
+                    Text("Highlight Mode")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.themeBlue)
+                    
+                    EncyclopediaItem(icon: "selection.pin.in.out", title: "Minimal Highlight", description: "When On, only the currently selected cell is highlighted. Turn Off to access Detailed Mode.")
+                    
+                    EncyclopediaItem(icon: "hand.tap.fill", title: "Restriction", description: "(Detailed Mode) Highlights the selected cell's row, column, and 3x3 box, showing all rules affecting that spot.")
+                    
+                    EncyclopediaItem(icon: "viewfinder", title: "Potential", description: "(Detailed Mode) Visually reveals all valid empty spots where your selected number could be placed.")
+                    
+                    EncyclopediaItem(icon: "number.circle.fill", title: "Highlight Same Number", description: "Automatically highlights every instance of your selected number across the entire board.")
+                    
+                    EncyclopediaItem(icon: "square.grid.3x3.fill", title: "Highlight Same Note", description: "Highlights every cell containing the same Pencil note as your current selection.")
+                }
                 
-                EncyclopediaItem(icon: "highlighter", title: "None", description: "Disables all highlighting for a pure paper Sudoku experience.")
-                EncyclopediaItem(icon: "selection.pin.in.out", title: "Selection", description: "Highlights only the currently selected cell(s).")
-                EncyclopediaItem(icon: "viewfinder", title: "Restriction", description: "(Recommended) Highlights the selected cell's row, column, and 3x3 box, as well as all matching digits across the board.")
-            }
-            
-            Divider().padding(.vertical, 4)
-            
-            Group {
-                Text("Show Mistakes")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.themeBlue)
+                Divider()
                 
-                EncyclopediaItem(icon: "exclamationmark.triangle.fill", title: "Immediate", description: "Flags conflicting or mathematically incorrect digits in red the moment they are entered.")
-                EncyclopediaItem(icon: "checkmark.circle.fill", title: "When Board Full", description: "Only reveals errors once you have completely filled all 81 cells.")
-                EncyclopediaItem(icon: "prohibited", title: "Never", description: "The game will never flag errors. Use this for a truly 'Hardcore' challenge.")
-            }
-            
-            Divider().padding(.vertical, 4)
-            
-            EncyclopediaItem(icon: "slider.horizontal.3", title: "Auto-filter Combinations", description: "When enabled, the game automatically removes mathematically impossible notes inside Killer Cages and Sandwiches based on the target sums.")
-            
-            Divider().padding(.vertical, 4)
-            
-            Group {
-                Text("Hint Target")
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.themeBlue)
+                // MARK: Gameplay
+                Group {
+                    Text("Gameplay")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.themeBlue)
+                    
+                    EncyclopediaItem(icon: "exclamationmark.triangle.fill", title: "Show Mistakes", description: "• **Immediately**: Flags errors in red the moment they are entered.\n• **When Board Full**: Only reveals errors once the grid is finished.\n• **Never**: Mistakes are never flagged.")
+                    
+                    EncyclopediaItem(icon: "3.circle.fill", title: "Enable Mistake Limit", description: "Enforces 3-strike rule. Three incorrect moves will result in a game over.")
+                    
+                    EncyclopediaItem(icon: "lightbulb.fill", title: "Show Hint Button", description: "Toggles the visibility of the Hint system on the game screen.")
+                    
+                    EncyclopediaItem(icon: "p.square.fill", title: "Disable Completed Digits", description: "Stops the numpad from greying out and disabling numbers that have been placed 9 times.")
+                    
+                    EncyclopediaItem(icon: "list.bullet.rectangle.fill", title: "Show Combination Helpers", description: "Displays a list of all remaining mathematical combinations for selected Killer Cages or Sandwich sums.")
+                    
+                    EncyclopediaItem(icon: "slider.horizontal.3", title: "Auto-Filter Combinations", description: "Automatically erases candidate notes that are mathematically impossible within a cage or sandwich.")
+                    
+                    EncyclopediaItem(icon: "target", title: "Hint Target", description: "• **Selected Cell**: Forces the Hint engine to analyze your current focus.\n• **Random Cell**: Finds the single most logical deduction anywhere on the board.")
+                }
                 
-                EncyclopediaItem(icon: "scope", title: "Selected Cell", description: "Using a hint will attempt to find a logical deduction specifically for the cell you currently have highlighted.")
-                EncyclopediaItem(icon: "target", title: "Random Cell", description: "The engine will look at the entire board and reveal the next easiest logical step anywhere on the grid.")
+                Divider()
+                
+                // MARK: Appearance
+                Group {
+                    Text("Appearance")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.themeBlue)
+                    
+                    EncyclopediaItem(icon: "paintbrush.fill", title: "Theme", description: "Switch between Light mode, Dark mode, or System (which follows your device appearance).")
+                }
+                
+                Divider()
+                
+                // MARK: Support
+                Group {
+                    Text("Support")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.themeBlue)
+                    
+                    EncyclopediaItem(icon: "envelope.fill", title: "Contact Us", description: "Opens a direct email line to the developers for feedback or bug reports.")
+                    
+                    EncyclopediaItem(icon: "cart.fill", title: "Remove Ads", description: "A one-time purchase to permanently remove all advertisements from the game.")
+                    
+                    EncyclopediaItem(icon: "arrow.clockwise.circle.fill", title: "Restore Purchases", description: "Re-validates your premium 'Ad-Free' status on a new device or after an app reinstall.")
+                }
             }
         }
     }
