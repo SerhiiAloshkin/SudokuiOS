@@ -148,7 +148,9 @@ struct LevelPreviewModal: View {
                         // Solved -> Show "Play Again" (Restart) logic
                         Button(action: {
                             viewModel.resetLevelProgress(levelID: level.id)
-                            onPlay() // Navigate to fresh game
+                            adCoordinator.showInterstitialAd {
+                                onPlay() // Navigate to fresh game
+                            }
                         }) {
                             Text("Restart Level")
                                 .font(.headline)
@@ -161,7 +163,9 @@ struct LevelPreviewModal: View {
                     } else {
                         // Unsolved -> Continue/Start
                         Button(action: {
-                            onPlay()
+                            adCoordinator.showInterstitialAd {
+                                onPlay()
+                            }
                         }) {
                             Text(level.userProgress == nil ? "Start Level" : "Continue Level")
                                 .font(.headline)

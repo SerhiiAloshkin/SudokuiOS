@@ -61,7 +61,7 @@ struct KropkiLayer: View {
                     context.fill(Circle().path(in: rect), with: .color(.black))
                 }
                 
-                // 2. Draw White Dots
+                // 2. Draw White Dots (Solid Fill + Stroke)
                 for dot in whiteDots {
                     let center = getMidpoint(dot, cellSize: cellSize)
                     let rect = CGRect(
@@ -70,6 +70,7 @@ struct KropkiLayer: View {
                         width: dotRadius * 2,
                         height: dotRadius * 2
                     )
+                    // Explicit solid fill to cover grid lines
                     context.fill(Circle().path(in: rect), with: .color(.white))
                     context.stroke(
                         Circle().path(in: rect),

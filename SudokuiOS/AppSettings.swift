@@ -35,7 +35,7 @@ enum HintTarget: String, CaseIterable, Codable {
 
 @Model
 final class AppSettings {
-    var isMinimalHighlight: Bool = true
+    var isMinimalHighlight: Bool = false
     var highlightModeRaw: String = "restriction" // Stored as String for SwiftData simplicity
     var isTimerVisible: Bool = true
     // var isSoundEnabled: Bool = false // Sound system removed

@@ -13,6 +13,10 @@ final class AdCoordinator: NSObject, ObservableObject, FullScreenContentDelegate
     private var onAdDismissed: (() -> Void)?
     private let networkMonitor = NetworkMonitor()
     
+    // Cooldown Logic
+    private var lastAdShownTime: Date = .distantPast
+    private let adCooldownSeconds: TimeInterval = 90 // 1.5 minutes
+    
     override init() {
         super.init()
         loadAd()
@@ -66,6 +70,14 @@ final class AdCoordinator: NSObject, ObservableObject, FullScreenContentDelegate
         // 2. Check Connection
         if !networkMonitor.isConnected {
             print("No internet connection. Skipping ad.")
+            completion()
+            return
+        }
+        
+        // 2.5 Check Cooldown
+        let timeSinceLastAd = Date().timeIntervalSince(lastAdShownTime)
+        if timeSinceLastAd < adCooldownSeconds {
+            print("Ad Cooldown active. Seconds since last ad: \(Int(timeSinceLastAd)). Skipping.")
             completion()
             return
         }
@@ -127,6 +139,9 @@ final class AdCoordinator: NSObject, ObservableObject, FullScreenContentDelegate
         
         // Check what kind of ad it was
         if ad is InterstitialAd {
+             // Update Cooldown
+             lastAdShownTime = Date()
+             
              // Trigger completion on next run loop
              DispatchQueue.main.async { [weak self] in
                  self?.onAdDismissed?()

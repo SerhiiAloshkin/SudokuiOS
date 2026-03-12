@@ -1061,6 +1061,8 @@ struct SudokuGameView: View {
                             
                             // 2. Lines & Overlays Layer
                             Group {
+                                SudokuBoardOverlay()
+                                
                                 if let parity = gameViewModel.parityOverlay {
                                     OddEvenLayer(parityString: parity, cellSize: cellSize)
                                 }
@@ -1083,8 +1085,6 @@ struct SudokuGameView: View {
                                         backgroundColor: Color(uiColor: .systemBackground)
                                     )
                                 }
-                                
-                                SudokuBoardOverlay()
                             }
                             .zIndex(2)
                             
