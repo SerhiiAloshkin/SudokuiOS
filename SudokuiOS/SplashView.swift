@@ -8,7 +8,6 @@ struct SplashView: View {
     @State private var titleOffset: CGFloat = 20
     @State private var subtitleColors: [Color] = [.gray, .gray, .gray, .gray, .gray] // Initially hidden/gray
     @State private var subtitleOpacities: [Double] = [0, 0, 0, 0, 0]
-    @State private var progress: CGFloat = 0.0
     
     // Binding to toggle Main Menu (Keep for compatibility if used by other views, but we use appIsReady)
     @Binding var isActive: Bool
@@ -52,59 +51,34 @@ struct SplashView: View {
                             }
                         }
                     }
-                    
-                    // 4. Custom "Versa Style" Progress Bar
-                    VStack(spacing: 8) {
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.black.opacity(0.05))
-                                .frame(width: 200, height: 6)
-                            
-                            Capsule()
-                                .fill(getSubtitleColor())
-                                .frame(width: 200 * progress, height: 6)
-                        }
-                        
-                        Text("Loading Levels...")
-                            .font(.custom("AvenirNext-Medium", size: 12))
-                            .foregroundColor(getSubtitleColor().opacity(0.6))
-                    }
-                    .padding(.top, 20)
-                    .opacity(titleOpacity) // Sync with title fade-in
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity) // Center content
             }
         }
         .task {
-            // 1. Start a slow animation simulating a 15-second max load (up to 90%)
-            withAnimation(.linear(duration: 15.0)) {
-                progress = 0.90
-            }
-
-            // 2. Await the actual heavy background parsing
+            // 1. Start the visual animation sequence
+            runAnimationSequence()
+            
+            // 2. Perform the instant background loading
             await levelViewModel.loadLevelsData()
 
-            // 3. Once data is loaded, override the animation to quickly zip to 100%
-            withAnimation(.easeOut(duration: 0.5)) {
-                progress = 1.0
-            }
+            // 3. Force the view to wait for the logo animation to finish completely
+            // Animation sequence: 0.5s (Logo) + 0.5s (Delay) + 0.8s (Sudoku) + 1.0s (Versa start) + 4 * 0.1s (Versa staggered) = ~2.0s
+            // Sleep for 2.2 seconds for a smooth hold.
+            try? await Task.sleep(nanoseconds: 2_200_000_000) 
 
-            // 4. Wait for the zip animation to finish, then transition
-            try? await Task.sleep(nanoseconds: 600_000_000)
-            
-            withAnimation(.easeInOut(duration: 0.5)) {
+            // 4. Transition to Main Menu
+            withAnimation(.easeOut(duration: 0.5)) {
                 levelViewModel.appIsReady = true
             }
         }
         .onAppear {
-            // Initialize Logic (While animation plays)
+            // Initialize Logic
             if levelViewModel.modelContext == nil {
                 levelViewModel.updateContext(modelContext)
             } else {
                 levelViewModel.loadProgressFromSwiftData()
             }
-            
-            runAnimationSequence()
         }
     }
     
