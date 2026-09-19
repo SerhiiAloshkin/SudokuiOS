@@ -64,6 +64,14 @@ Pick the subfolder that matches the doc's topic; if none fits, propose a new one
 rather than defaulting to the root. Reference docs get updated in place; status/progress/plan
 docs are historical logs and are fine to accumulate in their subfolder.
 
+**Known gap**: Xcode's built-in Coding Intelligence assistant (the model picker in Xcode
+Settings, as opposed to Claude Code) has no mechanism to read this file, so it won't follow this
+policy and may drop a `.md` file at the root of either `SudokuiOS/` (this folder) or the outer
+repo root (`/SudokuiOS/`, one level up, where `.git`/`SudokuiOS.xcodeproj` actually live — note
+the two folders share a name, easy to mix up). This is expected, not a bug to chase — when a
+Claude Code session notices a stray root-level `.md`, sweep it into the matching `docs/`
+subfolder as routine cleanup (as happened with `HIGHLIGHT_TIMING_FIX.md` → `docs/build-fixes/`).
+
 ## Ad SDK Removal — Current Status
 
 **Already removed** (files deleted, all call sites cleaned up — verified against the live code,
