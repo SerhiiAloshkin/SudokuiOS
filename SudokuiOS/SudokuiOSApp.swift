@@ -1,8 +1,5 @@
 import SwiftData
 import SwiftUI
-import GoogleMobileAds
-import AdSupport
-import AppTrackingTransparency
 
 @main
 struct SudokuiOSApp: App {
@@ -11,7 +8,6 @@ struct SudokuiOSApp: App {
     
     // 2. Create ViewModel (StateObject ensures it lives as long as the app)
     @StateObject private var levelViewModel: LevelViewModel
-    @StateObject private var storeManager = StoreManager()
     @State private var appSettings: AppSettings?
     @Environment(\.scenePhase) private var scenePhase
     
@@ -51,21 +47,6 @@ struct SudokuiOSApp: App {
             
             // iCloud Sync Disabled
             // CloudStorageManager.shared.start()
-            
-            // Initialize AdMob with G-rated configuration
-            let config = MobileAds.shared.requestConfiguration
-            config.maxAdContentRating = GADMaxAdContentRating.general
-            
-            MobileAds.shared.start(completionHandler: nil)
-            
-            // Log IDFA for Test Device Registration
-            // Note: In production, tracking authorization must be requested first.
-            // For testing/debugging, we can log the identifier if available or zeros.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                 let idfa = ASIdentifierManager.shared().advertisingIdentifier
-                 print("YOUR_Nexus_6_Device_ID: \(idfa.uuidString)") // Label for easy grep
-                 print("AdMob Test Device ID: \(idfa.uuidString)")
-            }
         } catch {
             fatalError("Failed to initialize SwiftData container: \(error)")
         }
@@ -77,12 +58,10 @@ struct SudokuiOSApp: App {
                 if levelViewModel.appIsReady {
                     MainMenuView()
                         .environmentObject(levelViewModel)
-                        .environmentObject(storeManager)
                         .transition(.opacity)
                 } else {
                     SplashView(isActive: .constant(true))
                         .environmentObject(levelViewModel)
-                        .environmentObject(storeManager)
                 }
             }
             .animation(.easeInOut(duration: 0.5), value: levelViewModel.appIsReady)

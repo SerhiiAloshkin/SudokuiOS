@@ -69,12 +69,6 @@ final class AppSettings {
         self.appThemeRaw = theme.rawValue
     }
     
-    // Bridge to UserDefaults for Ad Free Status (User Request)
-    var didPurchaseRemoveAds: Bool {
-        get { UserDefaults.standard.bool(forKey: "isAdsRemoved") }
-        set { UserDefaults.standard.set(newValue, forKey: "isAdsRemoved") }
-    }
-    
     // Bridge to UserDefaults for Hint Targeting
     var hintAppliesToSelectedCell: Bool {
         get { UserDefaults.standard.bool(forKey: "hintAppliesToSelectedCell") }

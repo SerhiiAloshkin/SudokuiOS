@@ -3,8 +3,8 @@
 ## Project Overview
 iOS Sudoku game (SwiftUI + SwiftData) with 10 rule variants (Classic, Sandwich, Thermo, Arrow,
 Killer, Kropki, Odd-Even, Knight's-move, King's-move, Non-Consecutive — combinable on one
-level). 600 campaign levels plus a user-facing Level Builder for custom puzzles. Ad SDK
-(Google Mobile Ads) removal is in progress — see "Ad SDK Removal" below for current status.
+level). 600 campaign levels plus a user-facing Level Builder for custom puzzles. Fully ad-free —
+see "Ad SDK Removal" below for what was removed and the one remaining project-file cleanup step.
 
 **Before scanning or grepping the codebase for a task, read `docs/reference/CODE_MAP.md`
 first.** It's a routing index — "task X → file Y" — built specifically to avoid full-repo scans;
@@ -25,14 +25,14 @@ first, then update it in the same commit if you change behavior it describes.
   `LevelBuilderViewModel` (custom level creation)
 - **Views**: `MainMenuView` (`NavigationStack` root) → `SudokuGameView` (+ `SudokuBoardView`,
   `SudokuControlsView`, `SudokuHeaderView`) → overlays (Victory, pause, sandwich/killer helpers)
-- **Services**: `EnvironmentConfig` (ad unit IDs — currently dead code, see below), `StoreManager`
-  (IAP, `@EnvironmentObject`)
+- **Services**: none ad/IAP-related remain — `EnvironmentConfig`, `NetworkMonitor`,
+  `StoreManager`, and `HintSystemManager` were all deleted (dead and/or ad-related, see "Ad SDK
+  Removal" below)
 - **Known dead code**: `GameStateManager.swift`, `MoveHistoryManager.swift`, `TimerManager.swift`,
-  `HintSystemManager.swift`, `GamePersistenceManager.swift`,
-  `OptimizedPotentialHighlightCalculator.swift` all still exist on disk but have **zero call
-  sites** — abandoned parallel implementations, not wired into `SudokuGameViewModel`. Don't
-  "fix" them expecting it to affect the app; either delete them or wire them in deliberately.
-  Details in the reference doc §0.
+  `GamePersistenceManager.swift`, `OptimizedPotentialHighlightCalculator.swift` all still exist on
+  disk but have **zero call sites** — abandoned parallel implementations, not wired into
+  `SudokuGameViewModel`. Don't "fix" them expecting it to affect the app; either delete them or
+  wire them in deliberately. Details in the reference doc §0.
 
 ## Swift Conventions
 - Modern SwiftUI + Swift Concurrency; async/await used sparingly (main game loop is
@@ -74,28 +74,42 @@ subfolder as routine cleanup (as happened with `HIGHLIGHT_TIMING_FIX.md` → `do
 
 ## Ad SDK Removal — Current Status
 
-**Already removed** (files deleted, all call sites cleaned up — verified against the live code,
-not just planning docs): `AdCoordinator.swift`, `BannerAdView.swift`,
-`InterstitialAdManager.swift`. No `adCoordinator`/`AdCoordinator` references remain in any view
-or view model. The hint system (`SudokuGameViewModel.useHint()`) is already ad-free — it uses a
-flat 5-minute cooldown with no ad/IAP gating.
+**Complete as of 2026-09-19** (verified against the live code, not just planning docs — re-verify
+before trusting this if it's been a while, since another session has previously worked on this in
+parallel; don't trust a `docs/ad-removal/*.md` status report over the actual code):
 
-**Still remaining** (verified via grep, current as of this doc's last update):
-- `SudokuiOSApp.swift` still `import GoogleMobileAds`, `import AdSupport`,
-  `import AppTrackingTransparency`, and calls `MobileAds.shared.start(...)` + IDFA logging in
-  `init()` — needs that block removed.
-- `EnvironmentConfig.swift` still defines ad unit ID properties and imports `GoogleMobileAds` —
-  **zero remaining call sites**, safe to delete outright.
-- `NetworkMonitor.swift` — originally added for ad-serving connectivity checks; **zero remaining
-  call sites**, safe to delete outright.
-- Remove the `GoogleMobileAds` (and `AdSupport`/`AppTrackingTransparency` if unused elsewhere)
-  SPM dependency from the Xcode project once the above imports are gone.
-- `StoreManager.swift` still exposes the `isAdsRemoved` IAP flag — kept intentionally as a
-  "Remove Ads"/"Support Development" purchase; no action needed unless product direction changes.
-
-Before starting more ad-removal work, re-verify this list against the live files — another
-session may be actively working on this in parallel; don't trust a `docs/ad-removal/*.md` status
-report over the actual code.
+- `AdCoordinator.swift`, `BannerAdView.swift`, `InterstitialAdManager.swift`,
+  `EnvironmentConfig.swift`, `NetworkMonitor.swift` — deleted. No `adCoordinator`/`AdCoordinator`
+  references remain anywhere.
+- `SudokuiOSApp.swift` — `GoogleMobileAds`/`AdSupport`/`AppTrackingTransparency` imports and the
+  `MobileAds.shared.start(...)` + IDFA-logging init block removed.
+- `Info.plist` — `GADApplicationIdentifier` and the ~55-entry `SKAdNetworkItems` array removed.
+- The hint system (`SudokuGameViewModel.useHint()`) was already ad-free (flat 5-minute cooldown,
+  no ad/IAP gating).
+- **The "Remove Ads" IAP was removed entirely, not just its ad-related copy** — this was a
+  deliberate product decision (explicitly confirmed), not just dead-code cleanup, because the
+  purchase button had already been silently dropped from `SettingsView.swift` in an earlier pass
+  while `StoreManager.swift` kept auto-restoring the flag for past purchasers, and that flag also
+  unlocked all 600 levels (independent of ads) via `LevelViewModel`'s unlock algorithm. Deleted:
+  `StoreManager.swift`, `HintSystemManager.swift` (dead + carried a rewarded-ad-shaped API),
+  `AppSettings.didPurchaseRemoveAds`, `LevelViewModel.hasRemovedAds` and its "remove-ads unlocks
+  everything" unlock rule (was Rule 3 in `recalculateLocks`). **Effect on existing customers**:
+  anyone who previously purchased "Remove Ads" no longer gets automatic full-level access from
+  that entitlement — levels now unlock only via normal sequential progression or the debug
+  override. If this needs to be revisited (e.g. a real App Store Connect refund/support
+  obligation), that's a product decision, not a code one — flag it back to the user, don't just
+  restore the mechanic.
+- Two Encyclopedia entries in `HowToPlayView.swift` ("Remove Ads", "Restore Purchases") removed
+  to match — they described a purchase flow that no longer exists.
+- `SequentialUnlockTests.swift` updated to drop the `hasRemovedAds` parameter and its "Remove Ads
+  IAP unlocks all levels" test case. Three already-broken test files
+  (`UnlockingLogicTests.swift`, `SudokuiOSTests/LevelSelectionTests.swift`,
+  `SudokuiOSTests/LevelManagerTests.swift`) still reference the now-fully-removed
+  `isAdUnlocked`/`unlockLevelViaAd` — not newly broken by this change, but now doubly stale; see
+  `docs/reference/CODE_MAP.md` §4.
+- Remove the `GoogleMobileAds` SPM dependency from the Xcode project itself (`project.pbxproj`
+  package references) — this is the one piece that can't be done from a text-editing pass; needs
+  Xcode or manual `.pbxproj` surgery.
 
 ## Engineering Policies
 

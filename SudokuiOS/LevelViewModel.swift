@@ -239,12 +239,6 @@ class LevelViewModel: ObservableObject {
     // UserDefaults Key for Sticky Unlocks
     private let kUnlockedLevelsKey = "com.sudokuios.unlockedLevels"
     
-    // IAP Helper (Wraps UserDefaults)
-    var hasRemovedAds: Bool {
-        get { UserDefaults.standard.bool(forKey: "isAdsRemoved") }
-        set { UserDefaults.standard.set(newValue, forKey: "isAdsRemoved") }
-    }
-    
     // Debug Unlock Helper (Wraps UserDefaults)
     var devAllUnlocked: Bool {
         get { UserDefaults.standard.bool(forKey: "devAllUnlocked") }
@@ -302,7 +296,6 @@ class LevelViewModel: ObservableObject {
             
             // C. Fetch unlocked IDs from UserDefaults
             let unlockedIDs = Set(UserDefaults.standard.array(forKey: "com.sudokuios.unlockedLevels") as? [Int] ?? [])
-            let hasRemovedAds = UserDefaults.standard.bool(forKey: "isAdsRemoved")
             let debugUnlock = UserDefaults.standard.bool(forKey: "devAllUnlocked")
 
             // D. Map everything in O(N) using the O(1) Dictionary
@@ -333,7 +326,7 @@ class LevelViewModel: ObservableObject {
             }
             
             // E. Calculate Locks in memory (Eradicates 600 UI updates)
-            LevelViewModel.recalculateLocks(for: &localLevels, hasRemovedAds: hasRemovedAds, debugUnlock: debugUnlock)
+            LevelViewModel.recalculateLocks(for: &localLevels, debugUnlock: debugUnlock)
             
             return localLevels
         }.value
@@ -431,84 +424,6 @@ class LevelViewModel: ObservableObject {
             print("Failed to fetch SwiftData progress: \(error)")
         }
     }
-    
-    // Cloud Sync Removed
-    // private func syncWithCloud() {
-    //     let cloud = CloudStorageManager.shared
-    //     var didChangeLocal = false
-    //
-    //
-    //     // 1. Solved Levels
-    //     for level in levels {
-    //         if level.isSolved {
-    //             // Local -> Cloud
-    //             if !cloud.solvedLevels.contains(level.id) {
-    //                 cloud.markLevelSolved(level.id)
-    //             }
-    //         } else {
-    //             // Cloud -> Local
-    //             if cloud.solvedLevels.contains(level.id) {
-    //                 // Update In-Memory
-    //                 if let idx = levels.firstIndex(where: {$0.id == level.id}) {
-    //                     levels[idx].isSolved = true
-    //                 }
-    //                 // Update SwiftData
-    //                 saveProgress(levelId: level.id, timeElapsed: 0) // Time unknown from cloud
-    //                 didChangeLocal = true
-    //             }
-    //         }
-    //
-    //         // 2. Ad Unlocked
-    //         if level.isAdUnlocked {
-    //             if !cloud.adUnlockedLevels.contains(level.id) {
-    //                 cloud.markLevelAdUnlocked(level.id)
-    //             }
-    //         } else {
-    //             if cloud.adUnlockedLevels.contains(level.id) {
-    //                 if let idx = levels.firstIndex(where: {$0.id == level.id}) {
-    //                     levels[idx].isAdUnlocked = true
-    //                 }
-    //                 // Persist
-    //                 unlockLevelViaAd(level.id) // Reuse existing logic
-    //                 didChangeLocal = true
-    //             }
-    //         }
-    //
-    //         // 3. Sticky Unlocked
-    //         if level.isUnlocked {
-    //             if !cloud.stickyUnlockedLevels.contains(level.id) {
-    //                 cloud.markLevelStickyUnlocked(level.id)
-    //             }
-    //         } else {
-    //             if cloud.stickyUnlockedLevels.contains(level.id) {
-    //                 if let idx = levels.firstIndex(where: {$0.id == level.id}) {
-    //                     levels[idx].isUnlocked = true
-    //                 }
-    //                 // Persist
-    //                 unlockLevel(level.id) // Reuse existing logic
-    //                 didChangeLocal = true
-    //             }
-    //         }
-    //     }
-    //
-    //     // 4. Removed Ads
-    //     if hasRemovedAds {
-    //         if !cloud.hasRemovedAds {
-    //             cloud.setRemovedAds(true)
-    //         }
-    //     } else {
-    //         if cloud.hasRemovedAds {
-    //             hasRemovedAds = true
-    //             // Persist to UserDefaults or wherever hasRemovedAds is stored
-    //             // (Assuming simple storage for now, verification later)
-    //             didChangeLocal = true
-    //         }
-    //     }
-    //
-    //     if didChangeLocal {
-    //         refreshLocks()
-    //     }
-    // }
     
     func saveProgress(levelId: Int, customUUID: String? = nil, timeElapsed: Int, isPerfect: Bool = false, mistakesMade: Int = 0) {
         // 1. Update In-Memory
@@ -725,46 +640,39 @@ class LevelViewModel: ObservableObject {
     // MARK: - Game Logic
     
     private func refreshLocks() {
-        let hasRemovedAds = UserDefaults.standard.bool(forKey: "isAdsRemoved")
         let debugUnlock = UserDefaults.standard.bool(forKey: "devAllUnlocked")
-        
+
         var localLevels = self.levels
-        LevelViewModel.recalculateLocks(for: &localLevels, hasRemovedAds: hasRemovedAds, debugUnlock: debugUnlock)
+        LevelViewModel.recalculateLocks(for: &localLevels, debugUnlock: debugUnlock)
         self.levels = localLevels
     }
-    
-    private nonisolated static func recalculateLocks(for levels: inout [SudokuLevel], hasRemovedAds: Bool, debugUnlock: Bool) {
+
+    private nonisolated static func recalculateLocks(for levels: inout [SudokuLevel], debugUnlock: Bool) {
         let endOfFirstSection = min(250, levels.count)
         let firstSectionSolved = levels[0..<endOfFirstSection].allSatisfy { $0.isSolved }
-        
+
         for i in 0..<levels.count {
             if debugUnlock {
                 levels[i].isLocked = false
                 continue
             }
-            
+
             let levelID = levels[i].id
-            
+
             // Unlocked Criteria:
             // 1. Is Solved -> Always Unlocked
             if levels[i].isSolved {
                 levels[i].isLocked = false
                 continue
             }
-            
+
             // 2. Level 1 is always unlocked
             if levelID == 1 {
                 levels[i].isLocked = false
                 continue
             }
-            
-            // 3. If user removed ads, unlock everything
-            if hasRemovedAds {
-                levels[i].isLocked = false
-                continue
-            }
-            
-            // 4. Sequential unlocking: Only unlock if previous level is solved
+
+            // 3. Sequential unlocking: Only unlock if previous level is solved
             // For level N, check if level N-1 is solved
             if i > 0 && levels[i - 1].isSolved {
                 // Section 1 (1-250): Previous level solved = unlock

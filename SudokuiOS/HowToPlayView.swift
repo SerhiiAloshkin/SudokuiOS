@@ -201,10 +201,6 @@ private struct SettingsSection: View {
                         .foregroundColor(.themeBlue)
                     
                     EncyclopediaItem(icon: "envelope.fill", title: "Contact Us", description: "Opens a direct email line to the developers for feedback or bug reports.")
-                    
-                    EncyclopediaItem(icon: "cart.fill", title: "Remove Ads", description: "A one-time purchase to permanently remove all advertisements from the game.")
-                    
-                    EncyclopediaItem(icon: "arrow.clockwise.circle.fill", title: "Restore Purchases", description: "Re-validates your premium 'Ad-Free' status on a new device or after an app reinstall.")
                 }
             }
         }

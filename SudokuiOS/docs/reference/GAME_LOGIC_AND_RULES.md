@@ -14,8 +14,12 @@ from an in-progress refactor.
 
 ## 0. Live vs. Dead Code (read this first)
 
-**UPDATE (Sept 18, 2026):** Phase 1 cleanup removed 6 confirmed dead files (~1,067 lines). See
-`PHASE1_CLEANUP.md` for details.
+**CORRECTION (2026-09-19):** a prior version of this table (and `docs/ad-removal/PHASE1_CLEANUP.md`)
+claimed 6 dead files were deleted in a "Phase 1 cleanup." That claim was **false** — verified by
+direct filesystem check, 5 of the 6 still existed on disk at that time. Only `HintSystemManager.swift`
+is actually deleted now, and that happened today as part of ad-IAP removal (it carried a
+rewarded-ad-shaped API), not any prior "Phase 1." **Don't trust a cleanup doc's claim that a file
+was deleted — check the filesystem.**
 
 The repo previously contained a set of "manager" classes that looked like a clean extraction of
 `SudokuGameViewModel`'s responsibilities, but **none of them were wired into the live game**.
@@ -24,15 +28,16 @@ The repo previously contained a set of "manager" classes that looked like a clea
 | Component | Status | Notes |
 |---|---|---|
 | `SudokuGameViewModel.swift` | **LIVE** | The real game engine. All board state, move validation, win detection, mistakes, undo/redo, hints, timer, save/load live here. |
-| ~~`GameStateManager.swift`~~ | **DELETED** | Removed in Phase 1 cleanup - was completely unused. |
-| ~~`MoveHistoryManager.swift`~~ | **DELETED** | Removed in Phase 1 cleanup - real undo/redo is SwiftData-backed (§4.5). |
-| ~~`TimerManager.swift`~~ | **DELETED** | Removed in Phase 1 cleanup - real timer logic is inline in `SudokuGameViewModel` (§4.7). |
-| ~~`HintSystemManager.swift`~~ | **DELETED** | Removed in Phase 1 cleanup - real hint system (§2.3) is already ad-free in `SudokuGameViewModel`. |
-| ~~`GamePersistenceManager.swift`~~ | **DELETED** | Removed in Phase 1 cleanup - real save/load is inline in `SudokuGameViewModel` (§4.8). |
+| `GameStateManager.swift` | **DEAD, still present** | Zero call sites. Not wired into `SudokuGameViewModel`. |
+| `MoveHistoryManager.swift` | **DEAD, still present** | Zero call sites. Real undo/redo is SwiftData-backed (§4.5). |
+| `TimerManager.swift` | **DEAD, still present** | Zero call sites. Real timer logic is inline in `SudokuGameViewModel` (§4.7). |
+| ~~`HintSystemManager.swift`~~ | **DELETED (2026-09-19)** | Was dead (zero call sites) and carried a rewarded-ad-shaped API; real hint system (§2.3) is inline in `SudokuGameViewModel` and was already ad-free. |
+| `GamePersistenceManager.swift` | **DEAD, still present** | Zero call sites. Real save/load is inline in `SudokuGameViewModel` (§4.8). |
 | `PotentialHighlightCalculator.swift` | **LIVE** | The authoritative "valid placement" highlight algorithm (§2.2). |
-| ~~`OptimizedPotentialHighlightCalculator.swift`~~ | **DELETED** | Removed in Phase 1 cleanup - was incomplete and never used. |
+| `OptimizedPotentialHighlightCalculator.swift` | **DEAD, still present** | Zero call sites, incomplete even internally. Safe to delete but not yet done. |
 | `HumanLogicSolver.swift` | **LIVE, narrow scope** | Only used by the Level Builder's "is this solvable" check (§2.1), not for in-game hints/highlights. |
-| `PointingPairsSolver.swift` (incl. nested `SandwichSolver`) | **Present, unclear if wired** | Duplicates constraint logic found elsewhere. No confirmed call site found — verify before relying on or modifying it. Phase 3 candidate for deletion. |
+| `PointingPairsSolver.swift` (incl. nested `SandwichSolver`) | **Present, unclear if wired** | Duplicates constraint logic found elsewhere. No confirmed call site found — verify before relying on or modifying it. |
+| `StoreManager.swift`, `EnvironmentConfig.swift`, `NetworkMonitor.swift` | **DELETED (2026-09-19)** | Ad-SDK/IAP remnants — see `CLAUDE.md` "Ad SDK Removal". |
 
 **Why this matters:** if a future task is "improve the hint system" or "speed up highlighting,"
 the correct file to touch is `SudokuGameViewModel.swift` / `PotentialHighlightCalculator.swift`.
@@ -342,32 +347,37 @@ future refactor here has no regression-test safety net today.
 - Difficulty labels are **static data baked into the JSON**, not computed at runtime by any
   solver/rating algorithm.
 
-### 3.2 Sequential unlock algorithm — `LevelViewModel.recalculateLocks` (`LevelViewModel.swift:739-789`)
+### 3.2 Sequential unlock algorithm — `LevelViewModel.recalculateLocks` (`LevelViewModel.swift`)
 
-**UPDATE (Sept 18, 2026):** Ad-unlock system removed. Game is now 100% ad-free. Only two unlock paths remain: sequential solving and premium IAP.
+**UPDATE (2026-09-19):** the "Remove Ads" IAP and its unlock-everything side effect were removed
+entirely (a deliberate product decision, not just ad-SDK dead-code cleanup — see `CLAUDE.md`'s
+"Ad SDK Removal" section). `recalculateLocks` no longer takes a `hasRemovedAds` parameter.
+Only two unlock paths remain: the debug override and normal sequential progression.
 
 Exact rule order, evaluated per level:
 1. Debug override (`debugUnlock`) → unlocks everything.
 2. Already solved → always unlocked (sticky).
 3. Level 1 → always unlocked.
-4. "Remove Ads" IAP (`hasRemovedAds`, reads `UserDefaults["isAdsRemoved"]`) → unlocks everything.
-5. **Sequential rule**: unlocked if the array-previous level (`levels[i-1]`, i.e. id N-1) is
+4. **Sequential rule**: unlocked if the array-previous level (`levels[i-1]`, i.e. id N-1) is
    solved — **AND**, if `levelID > 250`, ALL of levels 1-250 must also be solved (the
    Section-1/Section-2 barrier). Solving level 250 alone is not enough to open 251 if any earlier
    level in 1-250 is still unsolved.
-6. Otherwise locked.
+5. Otherwise locked.
 
-Important nuances confirmed by tests:
-- ~~**Ad-unlock is not durable across an unrelated `refreshLocks()` call.**~~ **REMOVED (Sept 18, 2026)** — Ad-unlock system completely removed. Game is now 100% ad-free.
+Important nuances:
 - The persisted "sticky" `isUnlocked` flag is tracked and stored but **currently not consulted at
   all** by `recalculateLocks` — vestigial with respect to the lock computation. Flag this to
   anyone extending the unlock system; don't assume setting `isUnlocked=true` alone unlocks
   anything.
-- `UnlockingLogicTests.testRemoveAdsUnlock` writes to UserDefaults key `"isAdFree"`, but the real
-  getter (`hasRemovedAds`) reads `"isAdsRemoved"` — likely a stale/broken test, don't trust it as
-  a live regression check for that flag.
 - `LevelViewModel.isMilestoneOneComplete` uses the identical `firstSectionSolved` predicate
   (all of 1-250 solved) as the barrier check.
+- **Effect on existing customers**: anyone who previously purchased "Remove Ads" no longer gets
+  automatic full-level access — that entitlement is gone along with the mechanic. This was an
+  explicit, confirmed product decision; don't silently restore it.
+- `UnlockingLogicTests.swift`, `SudokuiOSTests/LevelSelectionTests.swift`, and
+  `SudokuiOSTests/LevelManagerTests.swift` still reference the now-deleted `isAdUnlocked` field
+  and `unlockLevelViaAd()` method — already broken before this removal for unrelated API-mismatch
+  reasons (see `CODE_MAP.md` §4), now doubly stale.
 
 ### 3.3 Progress tracking
 
@@ -381,11 +391,10 @@ marks/cross snapshot data and a `moves: [MoveHistory]` relationship (cascade del
 - `levelSolved(...)` is the completion orchestration entry point: marks solved → saves progress →
   `unlockLevel(id + 1)` → `refreshLocks()`.
 - Key UserDefaults: `"com.sudokuios.unlockedLevels"` (sticky unlock list, redundant with the
-  SwiftData flag), **`"isAdsRemoved"` (IAP flag for premium unlock-all)**, `"devAllUnlocked"`
-  (debug override), plus session-resume keys (`"active_standard_session"`,
-  `"active_custom_session"`, `"lastPlayedMode"`, `"lastCustomLevelUUID"`, etc.).
-
-**Ad Removal Note (Sept 18, 2026):** The `"isAdsRemoved"` flag is **NOT** ad-related — it's an IAP (In-App Purchase) flag that unlocks all 600 levels instantly when a user purchases premium. The name is misleading legacy naming; it should be renamed to `"isPremiumUser"` or `"hasUnlockedAllLevels"` for clarity. No actual ad system exists in the game.
+  SwiftData flag), `"devAllUnlocked"` (debug override), plus session-resume keys
+  (`"active_standard_session"`, `"active_custom_session"`, `"lastPlayedMode"`,
+  `"lastCustomLevelUUID"`, etc.). `"isAdsRemoved"` no longer exists — removed 2026-09-19 along
+  with the rest of the "Remove Ads" IAP (see §3.2 and `CLAUDE.md`).
 
 ### 3.4 Custom Level Builder — no hard validation gate on save
 
@@ -665,15 +674,19 @@ no separate game-logic path for custom levels.
 - `PointingPairsSolver.swift`'s call sites were not conclusively confirmed as wired into the live
   UI in this scan — verify before assuming it drives any visible behavior, and before modifying it
   expecting a visible effect. **Phase 3 cleanup candidate.**
-- **Phase 1 cleanup complete (Sept 18, 2026):** Deleted 6 dead manager files
-  (`GameStateManager`, `TimerManager`, `HintSystemManager`, `GamePersistenceManager`,
-  `MoveHistoryManager`, `OptimizedPotentialHighlightCalculator`) - ~1,067 lines of confusing
-  unused code removed. See `PHASE1_CLEANUP.md` for full details.
-- **Ad removal complete (Sept 18, 2026):** Deleted all ad infrastructure (~290 lines).
-  Game is now 100% ad-free. Removed `AdCoordinator.swift`, `BannerAdView.swift`, 
-  `InterstitialAdManager.swift`, `unlockLevelViaAd()` function, and all `isAdUnlocked` tracking.
-  Only unlock methods remaining: (1) Sequential solve, (2) Premium IAP (`isAdsRemoved` flag).
-  See `AD_REMOVAL_COMPLETE.md` for full details.
+- **That "Phase 1 cleanup" claim was false** — see the correction at the top of §0. Five of the
+  six named manager files are still on disk and still dead, as of 2026-09-19.
+- **Ad/IAP removal complete (2026-09-19), verified against live code**: deleted
+  `AdCoordinator.swift`, `BannerAdView.swift`, `InterstitialAdManager.swift`,
+  `EnvironmentConfig.swift`, `NetworkMonitor.swift`, `StoreManager.swift`,
+  `HintSystemManager.swift`; removed the `GoogleMobileAds` init block and imports from
+  `SudokuiOSApp.swift`; removed `GADApplicationIdentifier`/`SKAdNetworkItems` from `Info.plist`;
+  and — a deliberate product decision, not dead-code cleanup — **fully removed the "Remove Ads"
+  IAP and its unlock-everything side effect** (`AppSettings.didPurchaseRemoveAds`,
+  `LevelViewModel.hasRemovedAds`, the `"isAdsRemoved"` UserDefaults key, and unlock rule that read
+  it). **No unlock-everything path remains except the debug override** — levels only unlock via
+  normal sequential progression now. Existing "Remove Ads" purchasers lose that unlock benefit;
+  this was confirmed, not assumed. See `CLAUDE.md` for the authoritative current-status summary.
 
 ---
 
@@ -693,12 +706,8 @@ except where a note says a test already reproduces it.
 
 ### 6.1 High priority — real bugs, not just risk
 
-- **Ad-unlock is not durable across `refreshLocks()` (§3.2).** Already reproduced by
-  `UnlockingLogicTests.testGapHandling` — this isn't speculative. A player can watch an ad to
-  unlock a gapped level, then lose that unlock the next time any unrelated level is solved. Fix
-  options: have `recalculateLocks` consult `isAdUnlocked`, or have ad-unlock actually persist
-  through the already-present-but-unused sticky `isUnlocked` flag (and have
-  `recalculateLocks` read it).
+- ~~Ad-unlock is not durable across `refreshLocks()`.~~ **Moot as of 2026-09-19** — the entire
+  ad-unlock/"Remove Ads" mechanic was removed (§3.2), so this bug no longer applies to anything.
 - **Custom Level Builder's Arrow line-length cap of 10 is unsatisfiable (§3.4).** A single-cell
   bulb can only hold a digit 1-9, so a 10-cell line can never sum to it. The cap is very likely
   meant to be 9 (matching Cage's cap and the bulb's own value range) — worth a quick diff/blame

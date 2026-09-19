@@ -15,7 +15,7 @@ Keep both updated in the same commit as any change they describe.
 |---|---|---|
 | A specific rule variant's validation (Classic/Sandwich/Thermo/Arrow/Killer/Kropki/Odd-Even/Knight/King/Non-Consecutive) | `SudokuValidator.swift` (`validateXxx` functions) | Exact semantics/edge cases: `GAME_LOGIC_AND_RULES.md` §1 |
 | Move entry, mistake counting, undo/redo, notes/pencil-marks, win detection, timer, save/load | `SudokuGameViewModel.swift` | The single 2865-line engine file. Details: `GAME_LOGIC_AND_RULES.md` §4 |
-| Hint button behavior / cooldown | `SudokuGameViewModel.useHint()` | **Not** `HintSystemManager.swift` — dead file, zero call sites |
+| Hint button behavior / cooldown | `SudokuGameViewModel.useHint()` | `HintSystemManager.swift` was a dead, ad-shaped duplicate — deleted 2026-09-19 |
 | "Valid placement" cell highlighting | `PotentialHighlightCalculator.swift` | **Not** `OptimizedPotentialHighlightCalculator.swift` — dead file, zero call sites |
 | Level unlock rules / sequential progression / the 250↔251 barrier | `LevelViewModel.recalculateLocks(...)` | Exact algorithm: `GAME_LOGIC_AND_RULES.md` §3.2 |
 | Level list filtering/sorting (by solved state or rule type) | `LevelSelectionViewModel.swift` (`LevelFilter` enum) | Filters match only a level's *primary* `ruleType`, not hybrid `types` |
@@ -29,8 +29,7 @@ Keep both updated in the same commit as any change they describe.
 | Level Builder tool logic (thermo/arrow/cage drawing rules, save behavior) | `LevelBuilderViewModel.swift` | `LevelBuilderView.swift` is almost pure rendering — logic lives in the view model |
 | Custom level persistence / progress restore on reopen | `CustomSudokuLevel.swift` (`toSudokuLevel()`) + `CustomGameWrapperView.swift` | Copy happens in `.onAppear`, deliberately not `body` (avoids re-render loops) |
 | In-app rules/tutorial text for a variant | `RulesView.swift` **and** `HowToPlayView.swift` | Two independently-maintained copies of the same rule text — keep both in sync |
-| IAP / "remove ads" purchase | `StoreManager.swift` | Single product `com.versa.removeads`; flag is `UserDefaults["isAdsRemoved"]`, read by both `StoreManager` and `LevelViewModel.hasRemovedAds` |
-| Anything Google Mobile Ads / AdMob | `CLAUDE.md` → "Ad SDK Removal" section first | Most of it is already gone; only `SudokuiOSApp.swift` init block + 2 dead files remain |
+| Anything ads or IAP-related | `CLAUDE.md` → "Ad SDK Removal" section | **Fully removed as of 2026-09-19** — no ad SDK, no IAP, no `StoreManager`/`EnvironmentConfig`/`NetworkMonitor`. Don't add code assuming any of these exist. |
 | Killer/Sandwich digit-combination helper popup | `KillerHelperView.swift`/`SandwichHelperView.swift` (display only) + `KillerMath.swift`/`SandwichMath.swift` (the actual combination math) | |
 | Writing or fixing a unit test | §4 (Test Map) below **first** | Most existing test files don't compile — don't copy their patterns without checking this table |
 
@@ -56,7 +55,7 @@ Keep both updated in the same commit as any change they describe.
 - `HumanLogicSolver.swift` — level-builder-only "is this solvable" advisory check (`LevelBuilderViewModel.checkValidation()`); not used for live hints
 - `PotentialHighlightCalculator.swift` — **live** "valid placement" highlight algorithm
 - `HighlightManager.swift` — knight/king offset constants (one of 3 duplicate copies in the codebase — see §3)
-- ~~`OptimizedPotentialHighlightCalculator.swift`~~ / ~~`HintSystemManager.swift`~~ — dead, see §3
+- `OptimizedPotentialHighlightCalculator.swift` — dead, still present, see §3. (`HintSystemManager.swift` was the same kind of dead file but has been deleted — see "Ad SDK Removal" in `CLAUDE.md`.)
 
 ### Levels: Campaign, Selection, Unlocking
 - `LevelViewModel.swift` — level collection, SwiftData progress, the sequential-unlock algorithm (`recalculateLocks`)
@@ -91,29 +90,25 @@ Keep both updated in the same commit as any change they describe.
 - `SudokuRuleTagView.swift` — tag/badge color mapping per variant
 
 ### Navigation & App Shell
-- `SudokuiOSApp.swift` — `@main` entry point, SwiftData `ModelContainer` setup, DI root. Still contains the remaining Ad SDK init block (see `CLAUDE.md`).
+- `SudokuiOSApp.swift` — `@main` entry point, SwiftData `ModelContainer` setup, DI root. No ad SDK code remains here (removed 2026-09-19).
 - `MainMenuView.swift` — owns the app's only `NavigationStack` and the `SudokuRoute` enum (the single source of navigation truth); also the home screen UI and "Continue" card
 - `SplashView.swift` — loading animation + kicks off level data load, no business logic
 
-### Settings, Theming, IAP
-- `SettingsView.swift` — all user-facing toggles, bound to `AppSettings` (SwiftData) plus a couple of legacy `@AppStorage` keys directly
+### Settings, Theming
+- `SettingsView.swift` — all user-facing toggles, bound to `AppSettings` (SwiftData) plus a couple of legacy `@AppStorage` keys directly. No purchase/IAP UI (removed).
 - `AppSettings.swift` — SwiftData settings model + enums (`HighlightMode`, `MistakeMode`, `HintTarget`, `AppTheme`); several properties silently bridge to `UserDefaults` instead of SwiftData, see §3
-- `StoreManager.swift` — StoreKit 2, single "remove ads" product, `@AppStorage("isAdsRemoved")`
 - `ThemeColors.swift`, `ButtonStyles.swift` — pure style utilities, no state
 
 ### Misc UI Chrome (rendering only, no logic)
 - `SudokuLogoTitleView.swift`, `SudokuPreviewGrid.swift`, `WatermarkBackgroundView.swift`, `MailView.swift` (thin `MFMailComposeViewController` wrapper for Settings' contact-support flow)
-
-### Ad SDK Remnants
-- `EnvironmentConfig.swift`, `NetworkMonitor.swift` — dead, zero call sites anywhere in the app. See `CLAUDE.md` "Ad SDK Removal" for current status and what's actually left to remove.
 
 ---
 
 ## 3. Known Traps (check here before you waste a turn)
 
 1. ~~`GameOverOverlayView.swift` was dead/shadowed by a nested duplicate in `SudokuGameView.swift`.~~ **Fixed 2026-09-19** — the nested duplicate (which had stale, off-brand styling: plain black overlay, no animation, hardcoded colors) was deleted from `SudokuGameView.swift`; `GameOverOverlayView.swift` is now the single, live implementation and its call site (`SudokuGameView.swift:176`) resolves to it. If a game-over-screen bug report still doesn't match what you see in `GameOverOverlayView.swift`, re-check for a reintroduced duplicate before assuming this file is wrong.
-2. **Six "manager" classes are unused parallel implementations**, not wired into `SudokuGameViewModel`: `GameStateManager.swift`, `MoveHistoryManager.swift`, `TimerManager.swift`, `HintSystemManager.swift`, `GamePersistenceManager.swift`, `OptimizedPotentialHighlightCalculator.swift`. All real behavior for these responsibilities is inline in `SudokuGameViewModel.swift` / `PotentialHighlightCalculator.swift`. Confirm via `/usr/bin/grep` (not bare `grep` — see below) before assuming any of these six affect the running app.
-3. **`AppSettings` has mixed persistence.** Most flags are real SwiftData stored properties; `didPurchaseRemoveAds`, `hintAppliesToSelectedCell`, `nextHintAvailableDate`, `isMistakeLimitEnabled`, and `showHintButton` are computed properties that silently bridge to `UserDefaults` instead. If a setting isn't persisting as expected, check which mechanism that specific property actually uses.
+2. **Five "manager" classes are unused parallel implementations**, not wired into `SudokuGameViewModel`: `GameStateManager.swift`, `MoveHistoryManager.swift`, `TimerManager.swift`, `GamePersistenceManager.swift`, `OptimizedPotentialHighlightCalculator.swift`. All real behavior for these responsibilities is inline in `SudokuGameViewModel.swift` / `PotentialHighlightCalculator.swift`. Confirm via `/usr/bin/grep` (not bare `grep` — see below) before assuming any of these affect the running app. (A sixth, `HintSystemManager.swift`, was the same kind of dead file but carried an ad-shaped API and was deleted on 2026-09-19 during ad/IAP removal.)
+3. **`AppSettings` has mixed persistence.** Most flags are real SwiftData stored properties; `hintAppliesToSelectedCell`, `nextHintAvailableDate`, `isMistakeLimitEnabled`, and `showHintButton` are computed properties that silently bridge to `UserDefaults` instead. If a setting isn't persisting as expected, check which mechanism that specific property actually uses. (`didPurchaseRemoveAds` used to be one of these — removed along with the IAP it backed.)
 4. **Knight/king offset arrays are duplicated in 3+ places**: `HighlightManager.swift`, an inline literal in `PotentialHighlightCalculator.swift`, and `SudokuValidator.validateKnight`/`validateKing`. Kropki white/black/negative-constraint math is duplicated between `SudokuValidator.validateKropki` and `PointingPairsSolver.swift`. Classic row/col/box legality exists in at least 3 separate hand-written copies. Any rule-math change must be hunted down in all copies — grep for the constant/logic pattern, don't assume one file is the only place.
 5. **The shell's `grep`/`find` builtins can be broken/shadowed** by a bad shell snapshot function in this environment (produces a spurious "claude native binary not installed" error). If a plain `grep`/`find` call errors like that, retry with `/usr/bin/grep`/`/usr/bin/find` explicitly.
 6. **Another session may be actively editing ad-removal / build-fix files concurrently.** Don't trust a `docs/ad-removal/*.md` or `docs/progress/*.md` status doc claiming something is "complete" — verify against the live files first (see `CLAUDE.md`).
@@ -126,12 +121,12 @@ Keep both updated in the same commit as any change they describe.
 |---|---|---|---|
 | `HighlightSettingsTests.swift` (root) | Cell highlight logic (same-number/same-note/potential-mode) via `getHighlightType` | 4 | **No** — calls a `SudokuGameViewModel(levelID:parentViewModel:)` initializer that doesn't exist |
 | `OptimizationTests.swift` (root) | Timer lifecycle, board-parse perf, validation caching, move history, save debounce, hint cooldown | ~20 | **No** — calls `parseBoardString` (actually `private`) and `handleNumberInput` (doesn't exist; real method is `didTapNumber(_:)`) |
-| `SequentialUnlockTests.swift` (root) | Sequential/milestone unlock rules (levels 1, 2, 3, 100, 251-gate, remove-ads, debug-unlock) | 9 | **Likely yes** — self-contained, reimplements the unlock algorithm locally rather than calling `LevelViewModel` |
-| `UnlockingLogicTests.swift` (root) | `LevelViewModel` unlock, gap handling, 250-barrier, ad-unlock | 7 | **No** — wrong `levelSolved(...)` signature, and calls `unlockLevelViaAd(...)` which was removed from `LevelViewModel` (only a commented-out call remains) |
+| `SequentialUnlockTests.swift` (root) | Sequential/milestone unlock rules (levels 1, 2, 3, 100, 251-gate, debug-unlock) | 8 | **Likely yes** — self-contained, reimplements the unlock algorithm locally rather than calling `LevelViewModel`. Updated 2026-09-19: dropped the `hasRemovedAds` parameter and its "Remove Ads unlocks all" case to match the real algorithm after IAP removal. |
+| `UnlockingLogicTests.swift` (root) | `LevelViewModel` unlock, gap handling, 250-barrier, ad-unlock | 7 | **No** — wrong `levelSolved(...)` signature, and calls `unlockLevelViaAd(...)`/`isAdUnlocked` which no longer exist anywhere in `LevelViewModel`/`SudokuLevel` at all (not just a signature mismatch — the whole mechanic was removed 2026-09-19) |
 | `TestHelpers.swift` (root) | Not a test file — `XCTestCase` extension: `emptyBoard()`, board flatten/unflatten, `validateMove`/`validateBoard` wrapping the real `validate(board:rules:)` | n/a | Helpers themselves are API-consistent, but not wired into the test target (see below) |
 | `SudokuiOSTests/KnightKingLogicTests.swift` | Knight/King adjacency + tutorial highlighting | 3 | **Likely yes** |
 | `SudokuiOSTests/KropkiLogicTests.swift` | White/black dot + negative-constraint validation | 3 | **Likely yes** |
-| `SudokuiOSTests/LevelManagerTests.swift` | Level count (600), 251-gate, ad-unlock, next-level redirection, filters | 5 | **No** — wrong `findNextUnsolvedLevel` label/return type, calls removed `unlockLevelViaAd` |
+| `SudokuiOSTests/LevelManagerTests.swift` | Level count (600), 251-gate, ad-unlock, next-level redirection, filters | 5 | **No** — wrong `findNextUnsolvedLevel` label/return type; also calls `unlockLevelViaAd`/`isAdUnlocked`, which no longer exist anywhere (mechanic removed 2026-09-19) |
 | `SudokuiOSTests/LevelPreviewTests.swift` | Rule display names, time formatting, 251-gate | 3 | **No** — `makeLevel` helper uses a `SudokuLevel` initializer shape (`grid`/`timeElapsed` params) that doesn't match the real struct |
 | `SudokuiOSTests/LevelSelectionTests.swift` | Filter logic, first-unsolved lookup, 251-lock guard | 9 | **No** — constructs `SudokuLevel` omitting required `isLocked`/`isSolved` params |
 | `SudokuiOSTests/LevelViewModelTests.swift` | Init state, async level loading, `getLevel(by:)`, hybrid-rule JSON decoding | 4 | **Likely yes** |
