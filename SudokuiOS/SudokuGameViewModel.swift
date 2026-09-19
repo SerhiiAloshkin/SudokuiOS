@@ -48,7 +48,8 @@ class SudokuGameViewModel: ObservableObject {
     @Published var customLevelUUID: String? = nil
     @Published var customLevelTitle: String? = nil
     @Published var showCustomBoardError: Bool = false
-    
+    @Published var showMultiSelectHighlightTip: Bool = false
+
     // Multi-Select
     @Published var isMultiSelectMode: Bool = false
     @Published var selectedIndices: Set<Int> = []
@@ -1894,6 +1895,17 @@ class SudokuGameViewModel: ObservableObject {
     @Published var restrictedHighlightSet: Set<Int> = []
     
     private func updateRestrictions() {
+        // One-time tip: Potential-mode highlighting only applies to a single selected cell —
+        // once 2+ cells are selected, highlighting silently falls back to Row/Column/Box
+        // relations regardless of the Potential/Restriction setting. Explain this once.
+        if selectedIndices.count > 1,
+           settings?.highlightMode == .potential,
+           !(settings?.isMinimalHighlight ?? true),
+           settings?.hasSeenMultiSelectHighlightNote == false {
+            settings?.hasSeenMultiSelectHighlightNote = true
+            showMultiSelectHighlightTip = true
+        }
+
         // Calculate common digit for Multi-Selection Highlight
         if selectedIndices.count > 1 {
             if let common = getCommonSelectedDigit() {

@@ -44,6 +44,7 @@ final class AppSettings {
     var showMistakes: Bool = true // Deprecated, keeping for migration/fallback
     var mistakeModeRaw: String = "onFull" // Default .onFull
     var hasSeenPotentialWarning: Bool = false
+    var hasSeenMultiSelectHighlightNote: Bool = false
     var hasSeenTutorial: Bool = false
     var isDisableCompletedDigitsEnabled: Bool = true
     var isCombinationHelperEnabled: Bool = true
@@ -51,7 +52,7 @@ final class AppSettings {
     var hintTargetRaw: String = "selectedCell" // Default Selected Cell
     var appThemeRaw: String = "light" // Default Light
     
-    init(isMinimalHighlight: Bool = true, highlightMode: HighlightMode = .restriction, isTimerVisible: Bool = true, isHighlightSameNumberEnabled: Bool = true, isHighlightSameNoteEnabled: Bool = true, showMistakes: Bool = true, mistakeMode: MistakeMode = .onFull, hasSeenPotentialWarning: Bool = false, hasSeenTutorial: Bool = false, isDisableCompletedDigitsEnabled: Bool = true, isCombinationHelperEnabled: Bool = true, isAutoFilterCombinationsEnabled: Bool = false, hintTarget: HintTarget = .selectedCell, theme: AppTheme = .light) {
+    init(isMinimalHighlight: Bool = true, highlightMode: HighlightMode = .restriction, isTimerVisible: Bool = true, isHighlightSameNumberEnabled: Bool = true, isHighlightSameNoteEnabled: Bool = true, showMistakes: Bool = true, mistakeMode: MistakeMode = .onFull, hasSeenPotentialWarning: Bool = false, hasSeenMultiSelectHighlightNote: Bool = false, hasSeenTutorial: Bool = false, isDisableCompletedDigitsEnabled: Bool = true, isCombinationHelperEnabled: Bool = true, isAutoFilterCombinationsEnabled: Bool = false, hintTarget: HintTarget = .selectedCell, theme: AppTheme = .light) {
         self.isMinimalHighlight = isMinimalHighlight
         self.highlightModeRaw = highlightMode.rawValue
         self.isTimerVisible = isTimerVisible
@@ -61,6 +62,7 @@ final class AppSettings {
         self.showMistakes = showMistakes
         self.mistakeModeRaw = mistakeMode.rawValue
         self.hasSeenPotentialWarning = hasSeenPotentialWarning
+        self.hasSeenMultiSelectHighlightNote = hasSeenMultiSelectHighlightNote
         self.hasSeenTutorial = hasSeenTutorial
         self.isDisableCompletedDigitsEnabled = isDisableCompletedDigitsEnabled
         self.isCombinationHelperEnabled = isCombinationHelperEnabled

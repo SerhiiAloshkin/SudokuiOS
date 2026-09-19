@@ -66,6 +66,11 @@ struct SudokuGameView: View {
             } message: {
                 Text("There are conflicts on the board. Please find and fix them to complete the puzzle.")
             }
+            .alert("Multi-Select Highlighting", isPresented: $gameViewModel.showMultiSelectHighlightTip) {
+                Button("Got it", role: .cancel) { }
+            } message: {
+                Text("While multiple cells are selected, highlighting shows Row/Column/Box relations instead of valid placement spots.")
+            }
             .sheet(isPresented: $gameViewModel.isSettingsPresented) {
                 SettingsView(settings: settings)
                 //   .presentationDetents([.medium])
