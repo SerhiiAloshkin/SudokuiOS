@@ -137,8 +137,8 @@ a comma-separated string; unrecognized tokens fall back to `.classic` with a con
   (`return false`)** — arrows are not tolerant of incompleteness.
 - Sum of line cells must equal bulb value exactly.
 - Single-cell arrows (line length 1, direct value copy) are supported.
-- See §3.4 for a review note on the builder's Arrow line-length cap, which looks inconsistent
-  with what a single-cell bulb can actually hold.
+- The builder's Arrow line-length cap (§3.4) is 9, correctly matching what a single-cell bulb
+  (digit 1-9) can actually hold.
 
 ### 1.5 Killer (`.killer([Cage])`)
 
@@ -410,20 +410,15 @@ marks/cross snapshot data and a `moves: [MoveHistory]` relationship (cascade del
   > custom levels are a predictable support complaint.
 - Live UI-level input constraints while editing (not save-time validation): max 9 placements of
   the same clue digit; Thermo/Arrow paths built by sequential king-adjacent taps (Thermo max
-  length 5 if non-consecutive active else 9; **Arrow max length 10**; Cage max length 9); Killer
+  length 5 if non-consecutive active else 9; **Arrow max length 9**; Cage max length 9); Killer
   cage cells must be orthogonally adjacent to *any* existing cage cell; Kropki dots placed via two
   orthogonally-adjacent taps; sandwich clue input range `0` or `2...35`; cage sum input range
   `1...45`.
-  > ⚠️ **REVIEW NOTE — likely off-by-something bug:** an Arrow's bulb is a single grid cell, so
-  > its value is a single digit `1...9` (§1.4). A line of length 10 requires at least 10 distinct
-  > cells summing to the bulb value, but even the minimum possible sum of 10 cells (all `1`s,
-  > which would themselves violate Classic uniqueness anyway) is `10` — already greater than the
-  > maximum possible bulb value of `9`. A line length of 10 is therefore mathematically
-  > unsatisfiable by construction; the cap should almost certainly be **9**, matching Cage's
-  > length cap and the actual range of a bulb digit. Worth checking whether this is a typo
-  > (`10` vs `9`) or whether "length 10" actually means something different in the builder's
-  > counting (e.g. includes the bulb cell itself, which would make max *line* length 9 — still
-  > worth confirming against the code rather than assuming).
+  > ✅ **FIXED (verified 2026-09-19):** an earlier version of this doc flagged the Arrow cap as an
+  > unsatisfiable `10` (a single-digit bulb can't sum a 10-cell line). That's already been
+  > corrected in the code — `getMaxLength(for: .arrow)` returns `9`, with an inline comment
+  > `"FIX: Phase 1 Bug #2"` marking the fix. Confirmed directly against `LevelBuilderViewModel.swift`,
+  > not inferred from a status doc.
 - Rule-toggle exclusivity: Classic and Non-Consecutive are mutually exclusive (picking one clears
   the other; at least one must remain active). King/Knight are independent additive toggles.
   > ℹ️ **CLARIFIED:** this exclusivity is a **display-only** convenience, not a validation gap —
@@ -708,10 +703,8 @@ except where a note says a test already reproduces it.
 
 - ~~Ad-unlock is not durable across `refreshLocks()`.~~ **Moot as of 2026-09-19** — the entire
   ad-unlock/"Remove Ads" mechanic was removed (§3.2), so this bug no longer applies to anything.
-- **Custom Level Builder's Arrow line-length cap of 10 is unsatisfiable (§3.4).** A single-cell
-  bulb can only hold a digit 1-9, so a 10-cell line can never sum to it. The cap is very likely
-  meant to be 9 (matching Cage's cap and the bulb's own value range) — worth a quick diff/blame
-  check on that constant.
+- ~~Custom Level Builder's Arrow line-length cap of 10 is unsatisfiable.~~ **Fixed** — see §3.4,
+  confirmed 2026-09-19 the cap is now 9.
 - **Custom level `id` collision risk feeds directly into progress-loss risk (§3.5).**
   `UUID.hashValue % 1000` gives only 1000 buckets, and per-level progress for custom levels is
   keyed by this id. As the number of user-created levels grows, this stops being purely

@@ -8,7 +8,8 @@ struct RulesView: View {
     var isNegative: Bool = false
     
     @State private var currentTab = 0
-    
+    @State private var showEncyclopedia = false
+
     // Computed property for all valid variant rules (excluding classic)
     private var variantRules: [SudokuRuleType] {
         ruleTypes.filter { $0 != .classic }
@@ -39,12 +40,24 @@ struct RulesView: View {
             .navigationTitle("How to Play")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showEncyclopedia = true
+                    } label: {
+                        Label("Full Guide", systemImage: "book.fill")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         // Mark Tutorial as Seen
                         settings.hasSeenTutorial = true
                         dismiss()
                     }
+                }
+            }
+            .sheet(isPresented: $showEncyclopedia) {
+                NavigationStack {
+                    HowToPlayView()
                 }
             }
         }

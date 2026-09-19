@@ -16,6 +16,10 @@ For the full mechanics of validation, the game loop, hints, solving, and level u
 from the code and must be kept in sync with it. Don't re-derive that from scratch; read it
 first, then update it in the same commit if you change behavior it describes.
 
+For exactly what a specific button or control does, see **`docs/reference/GAMEPLAY_CONTROLS.md`**
+(game screen, Level Builder, navigation, Settings) — same rule: read before re-deriving, update
+in the same commit as any behavior change.
+
 ## Architecture
 **Pattern**: MVVM
 - **Models**: `SudokuLevel` (campaign level, Codable), `CustomSudokuLevel` (SwiftData `@Model`),

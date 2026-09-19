@@ -3,9 +3,11 @@
 **Purpose**: consult this before grepping or reading broadly to find code for a task. It answers
 "which file(s) do I need for X" so you don't have to scan the repo. For *how the logic actually
 behaves* (validation rules, game-loop mechanics, unlock algorithm, hint system), go to
-`GAME_LOGIC_AND_RULES.md` in this same folder — this doc is the index, that doc is the manual.
+`GAME_LOGIC_AND_RULES.md` in this same folder. For *what every button/control does, exactly* (game
+screen, Level Builder, navigation, Settings), go to `GAMEPLAY_CONTROLS.md` in this same folder.
+This doc is the index, the other two are the manuals.
 
-Keep both updated in the same commit as any change they describe.
+Keep all three updated in the same commit as any change they describe.
 
 ---
 
@@ -29,6 +31,7 @@ Keep both updated in the same commit as any change they describe.
 | Level Builder tool logic (thermo/arrow/cage drawing rules, save behavior) | `LevelBuilderViewModel.swift` | `LevelBuilderView.swift` is almost pure rendering — logic lives in the view model |
 | Custom level persistence / progress restore on reopen | `CustomSudokuLevel.swift` (`toSudokuLevel()`) + `CustomGameWrapperView.swift` | Copy happens in `.onAppear`, deliberately not `body` (avoids re-render loops) |
 | In-app rules/tutorial text for a variant | `RulesView.swift` **and** `HowToPlayView.swift` | Two independently-maintained copies of the same rule text — keep both in sync |
+| What a specific button/control does, exactly | `GAMEPLAY_CONTROLS.md` | Exhaustive per-control reference across the game screen, Level Builder, navigation, and Settings — check here before re-deriving from the view code |
 | Anything ads or IAP-related | `CLAUDE.md` → "Ad SDK Removal" section | **Fully removed as of 2026-09-19** — no ad SDK, no IAP, no `StoreManager`/`EnvironmentConfig`/`NetworkMonitor`. Don't add code assuming any of these exist. |
 | Killer/Sandwich digit-combination helper popup | `KillerHelperView.swift`/`SandwichHelperView.swift` (display only) + `KillerMath.swift`/`SandwichMath.swift` (the actual combination math) | |
 | Writing or fixing a unit test | §4 (Test Map) below **first** | Most existing test files don't compile — don't copy their patterns without checking this table |
@@ -85,7 +88,7 @@ Keep both updated in the same commit as any change they describe.
 - `GameOverOverlayView.swift` — the live game-over screen (matches `VictoryOverlayView.swift`'s visual style: `.ultraThinMaterial`, spring appear animation, gradient title)
 
 ### Rules / Tutorial UI
-- `RulesView.swift`, `HowToPlayView.swift` — two separately-maintained in-app rule explanations
+- `RulesView.swift`, `HowToPlayView.swift` — two separately-maintained in-app rule explanations. `RulesView` (the in-game "How to Play" sheet, per-variant rule cards) now has a "Full Guide" button opening `HowToPlayView` (the "Versa Encyclopedia," previously reachable only from the Main Menu) — added 2026-09-19 so Encyclopedia content is reachable mid-game.
 - `RulesListView.swift` — compact rule-badge row (icon+text → icons-only → scrollable), used by preview/list screens
 - `SudokuRuleTagView.swift` — tag/badge color mapping per variant
 
@@ -112,6 +115,8 @@ Keep both updated in the same commit as any change they describe.
 4. **Knight/king offset arrays are duplicated in 3+ places**: `HighlightManager.swift`, an inline literal in `PotentialHighlightCalculator.swift`, and `SudokuValidator.validateKnight`/`validateKing`. Kropki white/black/negative-constraint math is duplicated between `SudokuValidator.validateKropki` and `PointingPairsSolver.swift`. Classic row/col/box legality exists in at least 3 separate hand-written copies. Any rule-math change must be hunted down in all copies — grep for the constant/logic pattern, don't assume one file is the only place.
 5. **The shell's `grep`/`find` builtins can be broken/shadowed** by a bad shell snapshot function in this environment (produces a spurious "claude native binary not installed" error). If a plain `grep`/`find` call errors like that, retry with `/usr/bin/grep`/`/usr/bin/find` explicitly.
 6. **Another session may be actively editing ad-removal / build-fix files concurrently.** Don't trust a `docs/ad-removal/*.md` or `docs/progress/*.md` status doc claiming something is "complete" — verify against the live files first (see `CLAUDE.md`).
+7. **`LevelSelectionView.swift`'s `showGatekeeperAlert` is dead code.** The `@State` flag and its `.alert(...)` block exist, but nothing ever sets the flag `true` — the alert can never appear. The real 250/251-barrier messaging lives entirely in `LevelPreviewModal.swift` instead. Don't "fix" this alert expecting it to do anything; either wire it up deliberately or remove it.
+8. ~~`LevelBuilderView.swift` had a save-navigation bug~~ — **fixed 2026-09-19**: the success-message string for a brand-new level (`"Level saved successfully!"`) didn't match what the dismiss-handler checked for (`"Saved successfully!"`), so saving a new custom level didn't auto-navigate back. The check now matches the real string; both create and edit paths navigate back correctly. See `GAMEPLAY_CONTROLS.md` §2.
 
 ---
 
