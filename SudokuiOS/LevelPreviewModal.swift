@@ -3,7 +3,6 @@ import SwiftUI
 struct LevelPreviewModal: View {
     let level: SudokuLevel
     @ObservedObject var viewModel: LevelViewModel // To call reset
-    @ObservedObject var adCoordinator: AdCoordinator // Ad Manager
     
     // Actions needed to trigger navigation from Parent
     var onPlay: () -> Void
@@ -99,58 +98,42 @@ struct LevelPreviewModal: View {
                 VStack(spacing: 12) {
                     
                     if level.isLocked {
-                        // Locked State
-                        if level.id <= 250 {
-                            // Ad Unlockable
-                            Button(action: {
-                                adCoordinator.showRewardedVideo { success in
-                                    if success {
-                                        // Ad dismissed/completed -> Grant Unlock
-                                        viewModel.unlockLevelViaAd(level.id)
-                                        onPlay() // Proceed to game
-                                    } else {
-                                        // Failed
-                                        print("Ad failed or cancelled")
-                                    }
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: "play.rectangle.fill") // SF Symbol
-                                    Text("Unlock with Ad")
-                                }
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 55)
-                                .background(Color.blue) // Match Continue Level color
-                                .cornerRadius(12)
-                            }
-                        } else {
-                            // Barrier Locked (Levels > 250)
-                            if !viewModel.isMilestoneOneComplete {
-                                Text("Complete all previous 250 levels to unlock this challenge!")
-                                    .font(.subheadline)
-                                    .foregroundColor(.red)
+                        // Locked State - Show message to complete previous level
+                        VStack(spacing: 8) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.gray)
+                            
+                            if level.id > 250 && !viewModel.isMilestoneOneComplete {
+                                Text("Complete all levels 1-250 first!")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
                                     .multilineTextAlignment(.center)
-                                    .padding()
-                                    .background(Color.red.opacity(0.1))
-                                    .cornerRadius(12)
-                            } else {
-                                Text("Complete Previous Level or Watch Ad") // Fallback / Should trigger Ad Logic if allowed
+                                
+                                Text("You must complete the first 250 levels to unlock the advanced series.")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
-                                    .padding()
-                                    .background(Color.gray.opacity(0.1))
-                                    .cornerRadius(12)
+                                    .multilineTextAlignment(.center)
+                            } else {
+                                Text("Complete Level \(level.id - 1) to unlock")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                    .multilineTextAlignment(.center)
+                                
+                                Text("Levels unlock sequentially as you progress through the game.")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                             }
                         }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(12)
                     } else if level.isSolved {
                         // Solved -> Show "Play Again" (Restart) logic
                         Button(action: {
                             viewModel.resetLevelProgress(levelID: level.id)
-                            adCoordinator.showInterstitialAd {
-                                onPlay() // Navigate to fresh game
-                            }
+                            onPlay() // Navigate directly without ad
                         }) {
                             Text("Restart Level")
                                 .font(.headline)
@@ -163,9 +146,7 @@ struct LevelPreviewModal: View {
                     } else {
                         // Unsolved -> Continue/Start
                         Button(action: {
-                            adCoordinator.showInterstitialAd {
-                                onPlay()
-                            }
+                            onPlay() // Navigate directly without ad
                         }) {
                             Text(level.userProgress == nil ? "Start Level" : "Continue Level")
                                 .font(.headline)

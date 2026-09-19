@@ -5,20 +5,16 @@ import Observation
 @MainActor
 struct SudokuGameView: View {
     @StateObject private var gameViewModel: SudokuGameViewModel
-    @EnvironmentObject private var storeManager: StoreManager
     
     var onNextLevel: (Int) -> Void = { _ in } // Callback for next level navigation, receives Target ID
-    @ObservedObject var adCoordinator: AdCoordinator // Injected for Rewarded Ads
     
-    init(levelID: Int, viewModel: LevelViewModel, adCoordinator: AdCoordinator, session: GameSession? = nil, title: String? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
+    init(levelID: Int, viewModel: LevelViewModel, session: GameSession? = nil, title: String? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
         self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(levelID: levelID, levelViewModel: viewModel, session: session, title: title))
-        self.adCoordinator = adCoordinator
         self.onNextLevel = onNextLevel
     }
     
-    init(level: SudokuLevel, viewModel: LevelViewModel, adCoordinator: AdCoordinator, session: GameSession? = nil, title: String? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
+    init(level: SudokuLevel, viewModel: LevelViewModel, session: GameSession? = nil, title: String? = nil, onNextLevel: @escaping (Int) -> Void = { _ in }) {
         self._gameViewModel = StateObject(wrappedValue: SudokuGameViewModel(level: level, levelViewModel: viewModel, session: session, title: title))
-        self.adCoordinator = adCoordinator
         self.onNextLevel = onNextLevel
     }
     
@@ -36,177 +32,193 @@ struct SudokuGameView: View {
     // Gesture State removed (moved to SudokuBoardView)
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                VStack(spacing: 8) {
-                    // Top Metadata Block
-                    SudokuHeaderView(gameViewModel: gameViewModel)
-                        .environmentObject(storeManager)
-                        .environmentObject(adCoordinator)
-                    
-                    // Game Board
-                    SudokuBoardView(gameViewModel: gameViewModel)
-                    
-                    // Spacer to push controls to bottom
-                    Spacer(minLength: 12)
-                    
-                    // Controls Container
-                    SudokuControlsView(gameViewModel: gameViewModel, showColorPicker: $showColorPicker)
-                        .environmentObject(storeManager)
-                        .environmentObject(adCoordinator)
-                    
-                    // Bottom Spacer to center controls in lower half
-                    Spacer(minLength: 20)
-                    
-                    // Banner Ad Integration
-                    if !settings.didPurchaseRemoveAds {
-                        BannerAdView()
-                            .frame(height: 50) // Standard Banner Height
-                            .padding(.bottom, 0) // Anchor to bottom
-                    }
-                }
-                .frame(width: geometry.size.width, height: geometry.size.height) // VStack fills screen
-                
-                // Pause Menu Overlay
-                if gameViewModel.isPaused {
-                    SudokuPauseOverlayView(gameViewModel: gameViewModel, showRestartAlert: $showRestartAlert)
-                }
-                
-                // Sandwich Helper Overlay
-                SudokuSandwichOverlayView(gameViewModel: gameViewModel)
-                
-                // Killer Helper Overlay
-                SudokuKillerOverlayView(gameViewModel: gameViewModel)
-                
-                // Game Over Overlay
-                if gameViewModel.isGameOver && !gameViewModel.isCustomLevel {
-                    GameOverOverlayView(
-                        onRestart: {
-                            gameViewModel.restartLevel()
-                        },
-                        onDismiss: {
-                            dismiss()
-                        }
-                    )
-                    .zIndex(200)
-                }
-                
-                // Victory Overlay
-                if gameViewModel.isGameComplete {
-                     // Calculate Next Unsolved Level
-                     let (nextID, nextVariant) = getNextLevelInfo()
-                     
-                     VictoryOverlayView(
-                        timeElapsed: gameViewModel.formattedTime,
-                        bestTime: gameViewModel.bestTime,
-                        currentLevelID: gameViewModel.levelID,
-                        nextLevelID: nextID,
-                        nextLevelVariant: nextVariant,
-                        mistakesMade: gameViewModel.mistakesCount,
-                        isCustomLevel: gameViewModel.isCustomLevel,
-                        adCoordinator: adCoordinator, // Pass Coordinator
-                        onNextLevel: {
-                            // Navigation Only (Ad handled by Overlay)
-                            onNextLevel(nextID)
-                        },
-                        onDismiss: {
-                            dismiss()
-                        }
-                     )
-                     .zIndex(200) // Ensure on top of everything
+        mainContentView
+            .background(SwipeGestureDisabler())
+            .onChange(of: scenePhase) { _, newPhase in
+                handleScenePhaseChange(newPhase)
+            }
+            .onAppear {
+                gameViewModel.setSettings(settings)
+                gameViewModel.startTimer()
+            }
+            .onChange(of: settings.isAutoFilterCombinationsEnabled) { _, newValue in
+                if newValue {
+                    gameViewModel.applyCombinationAutoFilter()
                 }
             }
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                gameViewModel.startTimer()
-            } else if newPhase == .background || newPhase == .inactive {
+            .onDisappear {
                 gameViewModel.stopTimer()
             }
-        }
-        .onAppear {
-            gameViewModel.setSettings(settings)
-            gameViewModel.startTimer()
-        }
-        .onChange(of: settings.isAutoFilterCombinationsEnabled) { _, newValue in
-            if newValue {
-                gameViewModel.applyCombinationAutoFilter()
+            .alert("Restart Level?", isPresented: $showRestartAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Restart", role: .destructive) {
+                    gameViewModel.restartLevel()
+                    gameViewModel.isPaused = false
+                }
+            } message: {
+                Text("This will clear all your progress.")
             }
-        }
-        .onDisappear {
-            gameViewModel.stopTimer()
-        }
-        .alert("Restart Level?", isPresented: $showRestartAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Restart", role: .destructive) {
-                gameViewModel.restartLevel()
-                gameViewModel.isPaused = false
+            .alert(gameViewModel.hintErrorMessage, isPresented: $gameViewModel.showHintErrorAlert) {
+                Button("OK", role: .cancel) { }
             }
-        } message: {
-            Text("This will clear all your progress.")
-        }
-        .alert(gameViewModel.hintErrorMessage, isPresented: $gameViewModel.showHintErrorAlert) {
-            Button("OK", role: .cancel) { }
-        }
-        .alert("Mistakes Found", isPresented: $gameViewModel.showCustomBoardError) {
-            Button("OK") { gameViewModel.showCustomBoardError = false }
-        } message: {
-            Text("There are conflicts on the board. Please find and fix them to complete the puzzle.")
-        }
-        .sheet(isPresented: $gameViewModel.isSettingsPresented) {
-            SettingsView(settings: settings)
-            //   .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $gameViewModel.isRulesPresented) {
-            RulesView(ruleTypes: gameViewModel.rules.isEmpty ? [.classic] : gameViewModel.rules, isNegative: gameViewModel.negativeConstraint)
-        }
-        .navigationTitle("")
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .background(SwipeGestureDisabler())
-
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                HStack(spacing: 20) {
-                    Button(action: {
-                        if !gameViewModel.isSolved && !gameViewModel.isGameComplete {
-                            gameViewModel.saveState()
+            .alert("Mistakes Found", isPresented: $gameViewModel.showCustomBoardError) {
+                Button("OK") { gameViewModel.showCustomBoardError = false }
+            } message: {
+                Text("There are conflicts on the board. Please find and fix them to complete the puzzle.")
+            }
+            .sheet(isPresented: $gameViewModel.isSettingsPresented) {
+                SettingsView(settings: settings)
+                //   .presentationDetents([.medium])
+            }
+            .sheet(isPresented: $gameViewModel.isRulesPresented) {
+                RulesView(ruleTypes: gameViewModel.rules.isEmpty ? [.classic] : gameViewModel.rules, isNegative: gameViewModel.negativeConstraint)
+            }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 20) {
+                        Button(action: {
+                            if !gameViewModel.isSolved && !gameViewModel.isGameComplete {
+                                gameViewModel.saveState()
+                            }
+                            dismiss()
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .semibold))
                         }
-                        dismiss()
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold)) // Match style
+                        
+                        Button(action: {
+                            gameViewModel.isRulesPresented = true
+                        }) {
+                            Image(systemName: "questionmark.circle")
+                                .font(.system(size: 20))
+                        }
                     }
-                    
-                    Button(action: {
-                        gameViewModel.isRulesPresented = true
-                    }) {
-                        Image(systemName: "questionmark.circle")
-                            .font(.system(size: 20))
+                }
+                ToolbarItem(placement: .principal) {
+                    Text(gameViewModel.formattedTime)
+                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                        .monospacedDigit()
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 20) {
+                        Button(action: { gameViewModel.isPaused = true }) {
+                            Image(systemName: "pause.circle")
+                                .font(.system(size: 20))
+                        }
+                        Button(action: { gameViewModel.isSettingsPresented = true }) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 16))
+                        }
                     }
                 }
             }
-            ToolbarItem(placement: .principal) {
-                Text(gameViewModel.formattedTime)
-                    .font(.system(size: 20, weight: .bold, design: .monospaced))
-                    .monospacedDigit()
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 20) {
-                    Button(action: { gameViewModel.isPaused = true }) {
-                        Image(systemName: "pause.circle")
-                            .font(.system(size: 20)) // Use 20 to match other icons or specific size
-                    }
-                    Button(action: { gameViewModel.isSettingsPresented = true }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 16))
-                    }
-                }
-            }
+    }
+    
+    private var mainContentView: some View {
+        GeometryReader { geometry in
+            gameContentStack(geometry: geometry)
         }
     }
     
+    private func gameContentStack(geometry: GeometryProxy) -> some View {
+        ZStack {
+            mainGameLayout(geometry: geometry)
+            overlayViews
+        }
+    }
+    
+    private func mainGameLayout(geometry: GeometryProxy) -> some View {
+        VStack(spacing: 8) {
+            // Top Metadata Block
+            SudokuHeaderView(gameViewModel: gameViewModel)
+            
+            // Game Board
+            SudokuBoardView(gameViewModel: gameViewModel)
+            
+            // Spacer to push controls to bottom
+            Spacer(minLength: 12)
+            
+            // Controls Container
+            SudokuControlsView(gameViewModel: gameViewModel, showColorPicker: $showColorPicker)
+            
+            // Bottom Spacer to center controls in lower half
+            Spacer(minLength: 20)
+        }
+        .frame(width: geometry.size.width, height: geometry.size.height)
+    }
+    
+    @ViewBuilder
+    private var overlayViews: some View {
+        // Pause Menu Overlay
+        if gameViewModel.isPaused {
+            SudokuPauseOverlayView(gameViewModel: gameViewModel, showRestartAlert: $showRestartAlert)
+        }
+        
+        // Sandwich Helper Overlay
+        SudokuSandwichOverlayView(gameViewModel: gameViewModel)
+        
+        // Killer Helper Overlay
+        SudokuKillerOverlayView(gameViewModel: gameViewModel)
+        
+        // Game Over Overlay
+        gameOverOverlay
+        
+        // Victory Overlay
+        victoryOverlay
+    }
+    
+    @ViewBuilder
+    private var gameOverOverlay: some View {
+        if gameViewModel.isGameOver && !gameViewModel.isCustomLevel {
+            GameOverOverlayView(
+                onRestart: {
+                    gameViewModel.restartLevel()
+                },
+                onDismiss: {
+                    dismiss()
+                }
+            )
+            .zIndex(200)
+        }
+    }
+    
+    @ViewBuilder
+    private var victoryOverlay: some View {
+        if gameViewModel.isGameComplete {
+            let (nextID, nextVariant) = getNextLevelInfo()
+            
+            VictoryOverlayView(
+                timeElapsed: gameViewModel.formattedTime,
+                bestTime: gameViewModel.bestTime,
+                currentLevelID: gameViewModel.levelID,
+                nextLevelID: nextID,
+                nextLevelVariant: nextVariant,
+                mistakesMade: gameViewModel.mistakesCount,
+                isCustomLevel: gameViewModel.isCustomLevel,
+                onNextLevel: {
+                    onNextLevel(nextID)
+                },
+                onDismiss: {
+                    dismiss()
+                }
+            )
+            .zIndex(200)
+        }
+    }
+    
+    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        if newPhase == .active {
+            gameViewModel.startTimer()
+        } else if newPhase == .background || newPhase == .inactive {
+            gameViewModel.stopTimer()
+        }
+    }
+}
+
+extension SudokuGameView {
     // MARK: - Helper Methods
     private func getNextLevelInfo() -> (id: Int, variant: SudokuRuleType) {
         let currentID = gameViewModel.levelID
@@ -425,10 +437,10 @@ struct SudokuGameView: View {
         let levelVM = LevelViewModel(modelContext: container.mainContext)
         
         Group {
-            SudokuGameView(levelID: 1, viewModel: levelVM, adCoordinator: AdCoordinator())
+            SudokuGameView(levelID: 1, viewModel: levelVM)
                 .environment(AppSettings())
             
-            SudokuGameView(levelID: 1, viewModel: levelVM, adCoordinator: AdCoordinator())
+            SudokuGameView(levelID: 1, viewModel: levelVM)
                 .environment(AppSettings())
                 .preferredColorScheme(.dark)
         }
@@ -532,27 +544,27 @@ struct SudokuGameView: View {
     struct GameOverOverlayView: View {
         let onRestart: () -> Void
         let onDismiss: () -> Void
-        
+
         var body: some View {
             ZStack {
                 Color.black.opacity(0.8) // Dark overlay background
                     .edgesIgnoringSafeArea(.all)
-                
+
                 VStack(spacing: 24) {
                     Image(systemName: "xmark.octagon.fill")
                         .font(.system(size: 60))
                         .foregroundColor(.red)
-                    
+
                     Text("Game Over")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
-                    
+
                     Text("You've made 3 mistakes.\nTime to try again!")
                         .multilineTextAlignment(.center)
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal)
-                    
+
                     VStack(spacing: 16) {
                         Button(action: onRestart) {
                             Text("Restart Level")
@@ -563,7 +575,7 @@ struct SudokuGameView: View {
                                 .background(Color.blue)
                                 .cornerRadius(12)
                         }
-                        
+
                         Button(action: onDismiss) {
                             Text("Back to Grid")
                                 .font(.headline)
@@ -586,61 +598,36 @@ struct SudokuGameView: View {
             }
         }
     }
-    
+
     // MARK: - Hint Button Component
     struct HintButtonView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
-        @ObservedObject var storeManager: StoreManager
-        @ObservedObject var adCoordinator: AdCoordinator
         
         var body: some View {
             Button(action: {
-                // Ensure action is only possible if not waiting
-                if !gameViewModel.isRewardedAdLoading && gameViewModel.hintCooldownRemaining == 0 {
-                    gameViewModel.useHint(storeManager: storeManager, adCoordinator: adCoordinator)
+                // Ensure action is only possible if not in cooldown
+                if gameViewModel.hintCooldownRemaining == 0 {
+                    gameViewModel.useHint()
                 }
             }) {
                 ZStack {
                     if gameViewModel.hintCooldownRemaining > 0 {
-                        // Cooldown Active (Universal)
+                        // Cooldown Active
                         Text("\(gameViewModel.hintCooldownRemaining / 60):\(String(format: "%02d", gameViewModel.hintCooldownRemaining % 60))")
                             .font(.system(size: 14, weight: .bold, design: .monospaced))
                             .foregroundColor(.orange)
-                            .frame(width: 38, height: 24) // Extra width to fit "00:00" format perfectly
-                    } else if gameViewModel.isRewardedAdLoading {
-                        // Loading Ad (Free Users Only)
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .purple))
-                            .scaleEffect(0.9)
-                            .frame(width: 24, height: 24)
+                            .frame(width: 38, height: 24)
                     } else {
                         // Ready State
-                        if storeManager.isAdsRemoved {
-                            // Ready to Hint (Premium)
-                            Image(systemName: "lightbulb.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.primary)
-                                .frame(width: 24, height: 24)
-                        } else {
-                            // Ready for Ad (Free)
-                            ZStack(alignment: .bottomTrailing) {
-                                Image(systemName: "lightbulb.fill")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundColor(.primary)
-                                
-                                Image(systemName: "play.rectangle.fill")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(.purple)
-                                    .offset(x: 4, y: 2)
-                            }
+                        Image(systemName: "lightbulb.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.primary)
                             .frame(width: 24, height: 24)
-                        }
                     }
                 }
             }
-            // Use standard styling, disable while loading ad or in cooldown
-            .buttonStyle(VersaButtonStyle(isEnabled: !gameViewModel.isRewardedAdLoading && gameViewModel.hintCooldownRemaining == 0))
-            .disabled(gameViewModel.isRewardedAdLoading || gameViewModel.hintCooldownRemaining > 0)
+            .buttonStyle(VersaButtonStyle(isEnabled: gameViewModel.hintCooldownRemaining == 0))
+            .disabled(gameViewModel.hintCooldownRemaining > 0)
         }
     }
     
@@ -696,8 +683,6 @@ struct SudokuGameView: View {
     struct SudokuHeaderView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
         @Environment(AppSettings.self) var settings
-        @EnvironmentObject var storeManager: StoreManager
-        @EnvironmentObject var adCoordinator: AdCoordinator
         
         var body: some View {
             ZStack(alignment: .top) {
@@ -705,9 +690,7 @@ struct SudokuGameView: View {
                 HStack {
                     if settings.showHintButton && !gameViewModel.isCustomLevel {
                         HintButtonView(
-                            gameViewModel: gameViewModel,
-                            storeManager: storeManager,
-                            adCoordinator: adCoordinator
+                            gameViewModel: gameViewModel
                         )
                         .padding(.leading)
                     }

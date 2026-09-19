@@ -41,7 +41,7 @@ class SudokuGameViewModel: ObservableObject {
     
     // Game State
     @Published var currentBoard: String = ""
-    private(set) var currentBoardArray: [Int] = Array(repeating: 0, count: 81)
+    private var currentBoardArray: [Int] = Array(repeating: 0, count: 81)
     @Published var selectedCellIndex: Int?
     @Published var isSolved: Bool = false
     @Published var isGameComplete: Bool = false 
@@ -190,7 +190,10 @@ class SudokuGameViewModel: ObservableObject {
     private(set) var initialBoardArray: [Int] = Array(repeating: 0, count: 81)
     private var solutionArray: [Int] = Array(repeating: 0, count: 81)
     
-    // Helper: parse board string → [Int]
+    // OPTIMIZATION: Cache parsed board to avoid repeated string parsing
+    private var boardParseCache: [String: [Int]] = [:]
+    
+    // Helper: parse board string → [Int] with caching
     private static func parseBoardString(_ s: String) -> [Int] {
         var result = [Int](repeating: 0, count: 81)
         var i = 0
@@ -199,6 +202,23 @@ class SudokuGameViewModel: ObservableObject {
             result[i] = ch.wholeNumberValue ?? 0
             i += 1
         }
+        return result
+    }
+    
+    /// Cached board parsing (instance method)
+    private func parseBoardStringCached(_ s: String) -> [Int] {
+        if let cached = boardParseCache[s] {
+            return cached
+        }
+        
+        let result = Self.parseBoardString(s)
+        
+        // Limit cache size to prevent memory bloat
+        if boardParseCache.count > 10 {
+            boardParseCache.removeAll()
+        }
+        
+        boardParseCache[s] = result
         return result
     }
     @Published var rules: [SudokuRuleType] = [] // Active Rules (Hybrid)
@@ -214,6 +234,14 @@ class SudokuGameViewModel: ObservableObject {
     @Published var parityOverlay: String? // For Odd-Even Sudoku
     @Published var bestTime: Double = 0.0
     
+    // OPTIMIZATION: Validation cache to avoid redundant checks
+    private var validationCache: [String: Bool] = [:]
+    private var cachedBoardHash: Int = 0
+    
+    // OPTIMIZATION: Debounce state saves to reduce I/O
+    private var saveStateTimer: Timer?
+    private var hasPendingSave: Bool = false
+    
     // New Gameplay Mechanics
     @Published var mistakesCount: Int = 0
     @Published var hintsUsed: Int = 0
@@ -222,7 +250,6 @@ class SudokuGameViewModel: ObservableObject {
     private var hintCooldownTimer: Timer?
     @Published var showHintErrorAlert: Bool = false
     var hintErrorMessage: String = ""
-    @Published var isRewardedAdLoading: Bool = false
     
 
     
@@ -269,6 +296,26 @@ class SudokuGameViewModel: ObservableObject {
         
         // Resume any active hint cooldown
         startHintCooldownTimer()
+    }
+    
+    deinit {
+        // CRITICAL FIX: Prevent timer-related memory leaks
+        // Invalidate all timers to break retain cycles
+        timer?.invalidate()
+        waveTimer?.invalidate()
+        hintCooldownTimer?.invalidate()
+        saveStateTimer?.invalidate() // OPTIMIZATION: Clean up debounce timer
+        
+        // NOTE: Cannot flush pending save in deinit due to @MainActor isolation
+        // Save should be flushed via saveStateImmediate() in scenePhase observer before dealloc
+        
+        // Clear any pending closures
+        timer = nil
+        waveTimer = nil
+        hintCooldownTimer = nil
+        saveStateTimer = nil
+        
+        print("✅ SudokuGameViewModel deallocated - Level \(levelID)")
     }
     
     private func loadLevelData(session: GameSession? = nil) {
@@ -560,6 +607,28 @@ class SudokuGameViewModel: ObservableObject {
     }
     
     func saveState() {
+        // OPTIMIZATION: Debounce saves to reduce I/O from 4-5x/sec to 1x/2sec
+        hasPendingSave = true
+        saveStateTimer?.invalidate()
+        
+        saveStateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.performSaveState()
+            }
+        }
+    }
+    
+    /// Immediate save (for critical moments like app backgrounding)
+    func saveStateImmediate() {
+        saveStateTimer?.invalidate()
+        hasPendingSave = false
+        performSaveState()
+    }
+    
+    /// Internal save logic
+    private func performSaveState() {
+        hasPendingSave = false
+        
         var boardArr = [Int](repeating: 0, count: 81)
         var chars = [Character]()
         chars.reserveCapacity(81)
@@ -1104,6 +1173,11 @@ class SudokuGameViewModel: ObservableObject {
     
     private func finishBatchUpdate(checkWin: Bool = false, wasBoardFull: Bool = false) {
         recalculateCompletedDigits()
+        
+        // CRITICAL: Update currentBoardArray immediately BEFORE calling updateRestrictions()
+        // This ensures highlighting calculations use the current board state, not stale data
+        syncCurrentBoardArray()
+        
         saveState()
         parentViewModel.modelContext?.processPendingChanges()
         // boardID = UUID() // REMOVED: Do not force full grid redraw. @Observable cells handle updates.
@@ -1115,6 +1189,24 @@ class SudokuGameViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 100_000_000)
                 checkForWin(wasBoardFull: wasBoardFull)
             }
+        }
+    }
+    
+    /// Synchronizes currentBoardArray with the current cell values immediately.
+    /// This is critical for real-time highlighting calculations.
+    private func syncCurrentBoardArray() {
+        var chars = [Character]()
+        chars.reserveCapacity(81)
+        
+        for cell in cells {
+            currentBoardArray[cell.id] = cell.value
+            chars.append(Character(String(cell.value)))
+        }
+        
+        // Also update currentBoard string to ensure isPlacementValid cache is invalidated
+        let newBoardString = String(chars)
+        if newBoardString != currentBoard {
+            currentBoard = newBoardString
         }
     }
 
@@ -1650,7 +1742,7 @@ class SudokuGameViewModel: ObservableObject {
     // MARK: - Hints
     
     @MainActor
-    func useHint(storeManager: StoreManager, adCoordinator: AdCoordinator) {
+    func useHint() {
         guard !isGameOver && !isSolved else { return }
         
         // 1. Check user preference
@@ -1692,47 +1784,29 @@ class SudokuGameViewModel: ObservableObject {
         
         guard let validTargetIndex = targetIndex else { return }
         
-        let applyHint = {
-            self.hintsUsed += 1
-            let correctValue = self.solutionArray[validTargetIndex]
-            
-            // Apply it via batch to handle note pruning, etc.
-            self.selectedIndices = [validTargetIndex]
-            
-            // Bypass note mode for hint application
-            let wasNoteMode = self.isNoteMode
-            self.isNoteMode = false
-            
-            // Only toggle the cell if we need to insert the value
-            // Since it's incorrect or empty, we just force enter the correct number
-            if self.cells[validTargetIndex].value != 0 {
-                // Clear incorrect value first
-                self.enterNumber(self.cells[validTargetIndex].value)
-            }
-            self.enterNumber(correctValue)
-            
-            self.isNoteMode = wasNoteMode
-            // Keep the cell selected for convenience
-            // self.selectedIndices = []
-        }
+        // Apply hint
+        self.hintsUsed += 1
+        let correctValue = self.solutionArray[validTargetIndex]
         
-        if storeManager.isAdsRemoved {
-            // Premium Cooldown (5 minutes = 300 seconds)
-            applyHint()
-            startPersistentHintCooldown()
-        } else {
-            // Rewarded Ad
-            self.isRewardedAdLoading = true
-            adCoordinator.showRewardedVideo { success in
-                DispatchQueue.main.async {
-                    self.isRewardedAdLoading = false
-                    if success {
-                        applyHint()
-                        self.startPersistentHintCooldown() // 5 minute persistent cooldown for all users
-                    }
-                }
-            }
+        // Apply it via batch to handle note pruning, etc.
+        self.selectedIndices = [validTargetIndex]
+        
+        // Bypass note mode for hint application
+        let wasNoteMode = self.isNoteMode
+        self.isNoteMode = false
+        
+        // Only toggle the cell if we need to insert the value
+        // Since it's incorrect or empty, we just force enter the correct number
+        if self.cells[validTargetIndex].value != 0 {
+            // Clear incorrect value first
+            self.enterNumber(self.cells[validTargetIndex].value)
         }
+        self.enterNumber(correctValue)
+        
+        self.isNoteMode = wasNoteMode
+        
+        // Start cooldown (5 minutes)
+        startPersistentHintCooldown()
     }
     
     private func startPersistentHintCooldown() {
@@ -1854,6 +1928,31 @@ class SudokuGameViewModel: ObservableObject {
     
     /// Comprehensive check for whether a digit can physically be placed in a cell (including all variant rules).
     func isPlacementValid(_ digit: Int, at index: Int) -> Bool {
+        // OPTIMIZATION: Check cache first
+        let boardHash = currentBoard.hashValue
+        
+        // Invalidate cache if board changed
+        if boardHash != cachedBoardHash {
+            validationCache.removeAll()
+            cachedBoardHash = boardHash
+        }
+        
+        let cacheKey = "\(index)-\(digit)"
+        if let cached = validationCache[cacheKey] {
+            return cached
+        }
+        
+        // Compute validation
+        let result = isPlacementValidUncached(digit, at: index)
+        
+        // Store in cache
+        validationCache[cacheKey] = result
+        
+        return result
+    }
+    
+    /// Internal validation logic (uncached)
+    private func isPlacementValidUncached(_ digit: Int, at index: Int) -> Bool {
         if !isValid(digit, at: index, ignoring: -1) { return false }
         
         if isNonConsecutive || rules.contains(.nonConsecutive) {

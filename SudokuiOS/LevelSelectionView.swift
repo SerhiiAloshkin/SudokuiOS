@@ -3,7 +3,6 @@ import SwiftUI
 struct LevelSelectionView: View {
     @EnvironmentObject var globalViewModel: LevelViewModel // The global data source
     @StateObject private var selectionViewModel = LevelSelectionViewModel() // Local filter state
-    @StateObject private var adCoordinator = AdCoordinator() // Ad Manager
     @State private var showLegend = false
     @State private var hasScrolled = false
     
@@ -175,7 +174,7 @@ struct LevelSelectionView: View {
                 levelToPlay = nil // Reset
             }
         }) { level in
-            LevelPreviewModal(level: level, viewModel: globalViewModel, adCoordinator: adCoordinator, onPlay: {
+            LevelPreviewModal(level: level, viewModel: globalViewModel, onPlay: {
                 // 1. Set Intent
                 levelToPlay = level
                 // 2. Dismiss Sheet (triggers onDismiss above)

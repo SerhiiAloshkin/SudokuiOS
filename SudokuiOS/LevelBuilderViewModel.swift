@@ -403,7 +403,7 @@ class LevelBuilderViewModel: ObservableObject {
         case .thermo:
             return isNonConsecutive ? 5 : 9
         case .arrow:
-            return 10 // 1 head + max 9 body cells (sum ≤ 9)
+            return 9 // 1 head + max 8 body cells (FIX: Phase 1 Bug #2)
         case .cage:
             return 9 // Mathematical rule: digits 1-9 cannot repeat, max 9 cells
         default:

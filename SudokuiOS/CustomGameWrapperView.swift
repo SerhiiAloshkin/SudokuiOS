@@ -9,7 +9,6 @@ import SwiftData
 struct CustomGameWrapperView: View {
     let customLevel: CustomSudokuLevel
     @ObservedObject var viewModel: LevelViewModel
-    @ObservedObject var adCoordinator: AdCoordinator
     @Environment(\.modelContext) private var modelContext
     @Binding var navigationStack: [MainMenuView.SudokuRoute]
     let session: GameSession?
@@ -22,7 +21,6 @@ struct CustomGameWrapperView: View {
                 SudokuGameView(
                     level: level,
                     viewModel: viewModel,
-                    adCoordinator: adCoordinator,
                     session: session,
                     title: customLevel.levelName
                 )

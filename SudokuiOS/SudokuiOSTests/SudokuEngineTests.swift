@@ -21,15 +21,15 @@ final class SudokuEngineTests: XCTestCase {
         board[0][0] = 5
         
         // Try placing '5' at (1,1) [Same Box] -> Should Fail
-        let sameBoxInvalid = validator.isValidMove(board, row: 1, col: 1, val: 5)
+        let sameBoxInvalid = validateMove(board: board, row: 1, col: 1, val: 5)
         XCTAssertFalse(sameBoxInvalid, "Classic: Duplicate in same 3x3 box should be invalid")
         
         // Try placing '5' at (0,3) [Different Box, Same Row] -> Should Fail (Row Rule)
-        let sameRowInvalid = validator.isValidMove(board, row: 0, col: 3, val: 5)
+        let sameRowInvalid = validateMove(board: board, row: 0, col: 3, val: 5)
         XCTAssertFalse(sameRowInvalid, "Classic: Duplicate in same row should be invalid")
         
         // Try placing '5' at (3,3) [Different Box, Different Row/Col] -> Should Pass
-        let validMove = validator.isValidMove(board, row: 3, col: 3, val: 5)
+        let validMove = validateMove(board: board, row: 3, col: 3, val: 5)
         XCTAssertTrue(validMove, "Classic: Non-conflicting placement should be valid")
     }
     
@@ -46,15 +46,15 @@ final class SudokuEngineTests: XCTestCase {
         for (r, c) in neighbors {
             // Try '4' (Diff 1)
             board[r][c] = 4
-            XCTAssertFalse(validator.validate(board: board, rules: rules), "Non-Consecutive: Neighbor \(r),\(c) with val 4 should fail")
+            XCTAssertFalse(validateBoard(board, rules: rules), "Non-Consecutive: Neighbor \(r),\(c) with val 4 should fail")
             
             // Try '6' (Diff 1)
             board[r][c] = 6
-            XCTAssertFalse(validator.validate(board: board, rules: rules), "Non-Consecutive: Neighbor \(r),\(c) with val 6 should fail")
+            XCTAssertFalse(validateBoard(board, rules: rules), "Non-Consecutive: Neighbor \(r),\(c) with val 6 should fail")
             
             // Try '3' (Diff 2) -> Should Pass (if isolated)
             board[r][c] = 3
-            XCTAssertTrue(validator.validate(board: board, rules: rules), "Non-Consecutive: Neighbor \(r),\(c) with val 3 should pass")
+            XCTAssertTrue(validateBoard(board, rules: rules), "Non-Consecutive: Neighbor \(r),\(c) with val 3 should pass")
             
             // Reset
             board[r][c] = 0
@@ -77,26 +77,13 @@ final class SudokuEngineTests: XCTestCase {
         
         for (r, c) in knightMoves {
             board[r][c] = 5
-            XCTAssertFalse(validator.validate(board: board, rules: rules), "Knight: Same value at \(r),\(c) should fail")
+            XCTAssertFalse(validateBoard(board, rules: rules), "Knight: Same value at \(r),\(c) should fail")
             board[r][c] = 0 // Reset
         }
         
-        // Check non-knight move (e.g., (4,5) adjacent) -> Should Pass Knight Rule (ignoring Classic)
-        // Note: SudokuValidator.validate combines ALL rules passed. If we pass ONLY .knight, it checks knight moves.
-        // But isValidMove default checks classic too. Use validate(board:rules:) for pure rule check if implemented that way,
-        // or ensure no classic conflict.
-        
-        board[4][5] = 5 // Adjacent, NOT knight move
-        // Classic rule would fail this, but let's check if the generic validate handles strict rule separation?
-        // SudokuValidator.validate typically checks *all* active rules.
-        // If we only pass [.knight], it *should* theoretically only check knight if implemented granularly,
-        // but often Classic is implicit base.
-        // Let's assume Classic is separate or we check a valid spot.
-        
-        // (4,8) is same row (Classic fail).
-        // (0,0) is far away, no knight connection.
+        // Check non-knight move at far position -> Should Pass Knight Rule
         board[0][0] = 5
-        XCTAssertTrue(validator.validate(board: board, rules: rules), "Knight: Unrelated position should pass")
+        XCTAssertTrue(validateBoard(board, rules: rules), "Knight: Unrelated position should pass")
     }
     
     // MARK: - Rule Constraints: King Move

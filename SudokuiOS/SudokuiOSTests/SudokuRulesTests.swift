@@ -22,7 +22,7 @@ final class SudokuRulesTests: XCTestCase {
         board[0][1] = 3
         board[0][2] = 5  // Duplicate!
         
-        let isValidZeroTwo = validator.isValidMove(board, row: 0, col: 2, val: 5)
+        let isValidZeroTwo = validateMove(board: board, row: 0, col: 2, val: 5)
         XCTAssertFalse(isValidZeroTwo, "Classic Rule: Placing duplicate 5 in row should be invalid")
         
         // CORRECT Example: Row 0 has 5, 3, 9 (No repeats)
@@ -30,7 +30,7 @@ final class SudokuRulesTests: XCTestCase {
         cleanBoard[0][0] = 5
         cleanBoard[0][1] = 3
         
-        let isValidNine = validator.isValidMove(cleanBoard, row: 0, col: 2, val: 9)
+        let isValidNine = validateMove(board: cleanBoard, row: 0, col: 2, val: 9)
         XCTAssertTrue(isValidNine, "Classic Rule: Placing non-duplicate 9 should be valid")
     }
     

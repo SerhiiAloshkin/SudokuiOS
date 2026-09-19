@@ -9,7 +9,6 @@ struct VictoryOverlayView: View {
     let nextLevelVariant: SudokuRuleType
     let mistakesMade: Int
     let isCustomLevel: Bool
-    @ObservedObject var adCoordinator: AdCoordinator // Injected Dependency
     let onNextLevel: () -> Void
     let onDismiss: () -> Void
     
@@ -138,13 +137,11 @@ struct VictoryOverlayView: View {
                         guard !isNavigating else { return }
                         isNavigating = true
                         
-                        // Trigger Ad, then Navigate
-                        adCoordinator.showInterstitialAd {
-                            if isCustomLevel {
-                                onDismiss()
-                            } else {
-                                onNextLevel()
-                            }
+                        // Navigate directly without ad
+                        if isCustomLevel {
+                            onDismiss()
+                        } else {
+                            onNextLevel()
                         }
                     }) {
                         HStack {
@@ -282,7 +279,6 @@ struct VictoryOverlayView: View {
         nextLevelVariant: .oddEven,
         mistakesMade: 0,
         isCustomLevel: false,
-        adCoordinator: AdCoordinator(), // Mock
         onNextLevel: {},
         onDismiss: {}
     )

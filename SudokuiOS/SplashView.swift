@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct SplashView: View {
     // 1. Control State

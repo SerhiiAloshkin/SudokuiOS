@@ -11,7 +11,6 @@ struct MainMenuView: View {
     @Query private var customLevels: [CustomSudokuLevel]
     @State private var showSettings = false
     @State private var navigationPath: [SudokuRoute] = []
-    @StateObject private var adCoordinator = AdCoordinator() // Manage Ads Globally/at Menu Level
     @State private var showButtons = false
     
     enum SudokuRoute: Hashable {
@@ -167,12 +166,11 @@ struct MainMenuView: View {
                     CustomGameWrapperView(
                         customLevel: level,
                         viewModel: viewModel,
-                        adCoordinator: adCoordinator,
                         navigationStack: $navigationPath,
                         session: session
                     )
                 case .game(let id, let session):
-                     SudokuGameView(levelID: id, viewModel: viewModel, adCoordinator: adCoordinator, session: session, onNextLevel: { targetID in
+                     SudokuGameView(levelID: id, viewModel: viewModel, session: session, onNextLevel: { targetID in
                          print("MainMenuView: traversing to next level \(targetID) from \(id)")
                          // Defer navigation to allow Ad dismissal to fully complete and view hierarchy to stabilize
                          DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {

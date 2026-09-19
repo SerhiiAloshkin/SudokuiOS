@@ -8,7 +8,6 @@ struct SudokuLevel: Identifiable, Codable, Equatable {
     var customTitle: String?
     var customUUID: String?
     var isLocked: Bool
-    var isAdUnlocked: Bool = false // Runtime state from persistence
     var isUnlocked: Bool = false // Sticky state
     var isSolved: Bool
     
@@ -324,7 +323,6 @@ class LevelViewModel: ObservableObject {
                     localLevels[i].lastSolvedTime = (progress.lastSolvedTime == 0 && progress.isSolved) ? progress.bestTime : progress.lastSolvedTime
                     localLevels[i].isPerfect = progress.isPerfect
                     localLevels[i].mistakesMade = progress.mistakesMade
-                    localLevels[i].isAdUnlocked = progress.isAdUnlocked
                     localLevels[i].isUnlocked = progress.isUnlocked
                 }
                 
@@ -424,7 +422,6 @@ class LevelViewModel: ObservableObject {
                     updatedLevels[i].lastSolvedTime = (progress.lastSolvedTime == 0 && progress.isSolved) ? progress.bestTime : progress.lastSolvedTime
                     updatedLevels[i].isPerfect = progress.isPerfect
                     updatedLevels[i].mistakesMade = progress.mistakesMade
-                    updatedLevels[i].isAdUnlocked = progress.isAdUnlocked
                     updatedLevels[i].isUnlocked = progress.isUnlocked
                 }
             }
@@ -740,11 +737,6 @@ class LevelViewModel: ObservableObject {
         let endOfFirstSection = min(250, levels.count)
         let firstSectionSolved = levels[0..<endOfFirstSection].allSatisfy { $0.isSolved }
         
-        // Find FIRST Unsolved Level ID (Natural Progress Point)
-        // If all 600 solved, this might be 601 (nil).
-        let firstUnsolvedIndex = levels.firstIndex(where: { !$0.isSolved })
-        let naturalUnlockID = (firstUnsolvedIndex != nil) ? levels[firstUnsolvedIndex!].id : Int.max
-        
         for i in 0..<levels.count {
             if debugUnlock {
                 levels[i].isLocked = false
@@ -754,47 +746,41 @@ class LevelViewModel: ObservableObject {
             let levelID = levels[i].id
             
             // Unlocked Criteria:
-            // 1. Is Solved -> Unlocked
+            // 1. Is Solved -> Always Unlocked
             if levels[i].isSolved {
                 levels[i].isLocked = false
                 continue
             }
             
-            // 2. Is Ad Unlocked OR Sticky Unlocked (Persistence) -> Unlocked
-            // EXCEPT for Level 251+, which overrides this if gate is closed.
-            let isUserUnlocked = levels[i].isAdUnlocked || levels[i].isUnlocked
+            // 2. Level 1 is always unlocked
+            if levelID == 1 {
+                levels[i].isLocked = false
+                continue
+            }
             
-            // 3. Section 1 (1-250) Logic
-            if levelID <= 250 {
-                if hasRemovedAds || isUserUnlocked {
+            // 3. If user removed ads, unlock everything
+            if hasRemovedAds {
+                levels[i].isLocked = false
+                continue
+            }
+            
+            // 4. Sequential unlocking: Only unlock if previous level is solved
+            // For level N, check if level N-1 is solved
+            if i > 0 && levels[i - 1].isSolved {
+                // Section 1 (1-250): Previous level solved = unlock
+                if levelID <= 250 {
                     levels[i].isLocked = false
-                } else if levelID == 1 {
-                    levels[i].isLocked = false
-                } else if levelID == naturalUnlockID {
-                    levels[i].isLocked = false
-                    // NOTE: Removed iterative persistent save here. 
-                    // Unlocks should be saved on solve or explicitly.
                 } else {
-                    levels[i].isLocked = true
-                }
-            } else {
-                // 4. Section 2 (251-600) Logic
-                // GATEKEEPER: If first section NOT solved, FORCE LOCK (unless it's Level 251 and we just solved 250? No, STRICT: must be ALL 1-250).
-                if !firstSectionSolved {
-                    levels[i].isLocked = true
-                } else {
-                    // Gate is OPEN. Apply standard logic.
-                    // If we just opened the gate, Level 251 should be unlocked.
-                    if hasRemovedAds || isUserUnlocked {
-                         levels[i].isLocked = false
-                    } else if levelID == 251 {
-                        levels[i].isLocked = false
-                    } else if levelID == naturalUnlockID {
+                    // Section 2 (251-600): Must also have completed all of section 1
+                    if firstSectionSolved {
                         levels[i].isLocked = false
                     } else {
-                         levels[i].isLocked = true
+                        levels[i].isLocked = true
                     }
                 }
+            } else {
+                // Previous level not solved = locked
+                levels[i].isLocked = true
             }
         }
     }
@@ -846,35 +832,6 @@ class LevelViewModel: ObservableObject {
     }
     
 
-    
-    // MARK: - Ad Unlock
-    func unlockLevelViaAd(_ id: Int) {
-        // 1. Update In-Memory
-        if let index = levels.firstIndex(where: { $0.id == id }) {
-            levels[index].isAdUnlocked = true
-            levels[index].isLocked = false // Immediate unlock
-        }
-        
-        // 2. Persist
-        guard let context = modelContext else { return }
-        
-        if let progress = fetchProgress(for: id, in: context) {
-            progress.isAdUnlocked = true
-        } else {
-             // Create new progress entry just for the unlock
-             let newProgress = UserLevelProgress(levelID: id, isAdUnlocked: true)
-             context.insert(newProgress)
-        }
-        
-        do { try context.save() } catch { print("Failed to save ad unlock: \(error)") }
-        
-        // 3. Refresh Locks (In case this unlock bridges a gap? Unlikely for sequential, but good practice)
-        refreshLocks()
-        
-        // Cloud Sync Disabled
-        // CloudStorageManager.shared.markLevelAdUnlocked(id)
-    }
-    
     
     // MARK: - Icon Helpers
     static func getLevelIconName(for id: Int) -> String? {

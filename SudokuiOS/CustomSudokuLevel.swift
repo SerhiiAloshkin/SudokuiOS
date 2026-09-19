@@ -182,8 +182,8 @@ final class CustomSudokuLevel: Identifiable {
         // De-duplicate types array
         typesArray = Array(Set(typesArray)).sorted(by: { $0.rawValue < $1.rawValue }) // Set for uniqueness, sort for stability
         
-        // Use unique negative ID from UUID hash to avoid collisions
-        let uniqueID = -abs(id.hashValue % 1_000) - 1
+        // Use unique negative ID from UUID hash (FIX: Phase 1 Bug #3 - full Int range to prevent collisions)
+        let uniqueID = -abs(id.hashValue)
         
         var level = SudokuLevel(
             id: uniqueID,

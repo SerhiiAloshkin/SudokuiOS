@@ -6,7 +6,6 @@ import MessageUI
 struct SettingsView: View {
     @Bindable var settings: AppSettings
     @Environment(\.dismiss) var dismiss
-    @EnvironmentObject private var storeManager: StoreManager
     
     // Warning State
     @State private var showPotentialWarning = false
@@ -16,8 +15,6 @@ struct SettingsView: View {
     @State private var showingMail = false
     @State private var mailResult: Result<MFMailComposeResult, Error>?
     @State private var showMailFallbackAlert = false
-    
-    @State private var showPurchaseError = false
     
     @AppStorage("isMistakeLimitEnabled") private var isMistakeLimitEnabled: Bool = true
     @AppStorage("showHintButton") private var showHintButton: Bool = true
@@ -113,53 +110,6 @@ struct SettingsView: View {
                                 .foregroundColor(.primary)
                         }
                     }
-                    
-                    if storeManager.isAdsRemoved {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Ads Removed")
-                        }
-                    } else {
-                        Button(action: {
-                            Task {
-                                await storeManager.purchaseRemoveAds()
-                                if storeManager.purchaseError != nil {
-                                    showPurchaseError = true
-                                }
-                            }
-                        }) {
-                            HStack {
-                                Text("Remove Ads")
-                                Spacer()
-                                if storeManager.isPurchasing {
-                                    ProgressView()
-                                } else if storeManager.products.isEmpty {
-                                    Text("Loading...")
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    if let product = storeManager.products.first(where: { $0.id == "com.versa.removeads" }) {
-                                        Text(product.displayPrice)
-                                            .foregroundColor(.secondary)
-                                    } else {
-                                        Text("$4.99")
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                            }
-                        }
-                        .disabled(storeManager.isPurchasing || storeManager.products.isEmpty)
-                        
-                        Button("Restore Purchases") {
-                            Task {
-                                await storeManager.restorePurchases()
-                                if storeManager.purchaseError != nil {
-                                    showPurchaseError = true
-                                }
-                            }
-                        }
-                        .disabled(storeManager.isPurchasing)
-                    }
                 }
                 
                 #if DEBUG
@@ -208,11 +158,6 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Your device is not configured to send emails. Please contact us at \(supportEmail).")
-            }
-            .alert("Purchase Error", isPresented: $showPurchaseError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(storeManager.purchaseError ?? "An unknown error occurred.")
             }
         }
     }
