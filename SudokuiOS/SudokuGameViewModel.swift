@@ -1362,6 +1362,10 @@ class SudokuGameViewModel: ObservableObject {
             } else {
                 explicitHighlightedDigit = number
             }
+            // Recompute Potential-mode highlight sets for the (possibly new) explicit digit —
+            // these otherwise only refresh on cell-selection changes, not numpad taps.
+            updateRestrictions()
+            updatePointPairRestrictions()
         } else {
             if isNoteMode {
                 toggleNote(number)
@@ -1921,27 +1925,23 @@ class SudokuGameViewModel: ObservableObject {
             return
         }
         
-        // Get valid selected digit
-        guard let anchor = selectedCellIndex, anchor < cells.count else {
+        // Get valid selected digit — prefers the numpad's explicit highlight digit (set when
+        // tapping a number with no cell selected), falls back to the selected cell's value,
+        // matching `selectedDigit`'s own priority so both entry points behave the same way.
+        guard let digit = selectedDigit, digit != 0 else {
             restrictedHighlightSet = []
             return
         }
-        
-        let cell = cells[anchor]
-        let digit = cell.value
-        if digit != 0 {
-            // Run Advanced Potential Highlight Calculator (Pruning & Contradictions)
-            restrictedHighlightSet = PotentialHighlightCalculator.calculatePotentials(
-                board: currentBoardArray,
-                digit: digit,
-                rules: rules,
-                isValid: { [weak self] d, i in
-                    self?.isPlacementValid(d, at: i) ?? false
-                }
-            )
-        } else {
-            restrictedHighlightSet = []
-        }
+
+        // Run Advanced Potential Highlight Calculator (Pruning & Contradictions)
+        restrictedHighlightSet = PotentialHighlightCalculator.calculatePotentials(
+            board: currentBoardArray,
+            digit: digit,
+            rules: rules,
+            isValid: { [weak self] d, i in
+                self?.isPlacementValid(d, at: i) ?? false
+            }
+        )
     }
     
     /// Comprehensive check for whether a digit can physically be placed in a cell (including all variant rules).
@@ -2054,17 +2054,20 @@ class SudokuGameViewModel: ObservableObject {
                  }
              }
 
-             // If it's a pure explicit highlight (1 or 0 cells selected), stop here.
-             // If multiple cells are selected, allow it to fall through to the intersection logic!
+             // If it's a pure explicit highlight (1 or 0 cells selected), stop here — UNLESS
+             // Potential mode would show placement highlights for it, in which case fall
+             // through so the logic below can do that (e.g. tapping a numpad digit with no
+             // cell selected should show potential spots, same as selecting a cell with that digit).
+             // If multiple cells are selected, always fall through to the intersection logic.
              if selectedIndices.count <= 1 {
-                 return isSameNoteMatch ? .sameNote : .none
+                 let potentialModeActive = !(settings?.isMinimalHighlight ?? true) && settings?.highlightMode == .potential
+                 if !potentialModeActive {
+                     return isSameNoteMatch ? .sameNote : .none
+                 }
              }
         }
-        
-        var selectedValue: Int = 0
-        if let anchor = selectedCellIndex, anchor < cells.count {
-             selectedValue = cells[anchor].value
-        }
+
+        let selectedValue: Int = selectedDigit ?? 0
         
         // Single Selection specific logic
         if selectedIndices.count == 1 {
@@ -2107,7 +2110,10 @@ class SudokuGameViewModel: ObservableObject {
         // 3. Logic based on Mode (Non-Minimal)
         if mode == .potential && selectedIndices.count <= 1 {
             // POTENTIAL MODE (If enabled in settings)
-            if selectedIndices.count == 1 && selectedValue != 0 {
+            // selectedValue already resolves to either the selected cell's digit or the
+            // numpad's explicit highlight digit (via `selectedDigit`), so this covers both
+            // "select a filled cell" and "tap a number with nothing selected."
+            if selectedValue != 0 {
                 let digit = selectedValue
                 let cellValue = getValueAt(index)
                 
