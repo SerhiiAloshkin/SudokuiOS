@@ -541,64 +541,6 @@ extension SudokuGameView {
         }
     }
     
-    struct GameOverOverlayView: View {
-        let onRestart: () -> Void
-        let onDismiss: () -> Void
-
-        var body: some View {
-            ZStack {
-                Color.black.opacity(0.8) // Dark overlay background
-                    .edgesIgnoringSafeArea(.all)
-
-                VStack(spacing: 24) {
-                    Image(systemName: "xmark.octagon.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.red)
-
-                    Text("Game Over")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-
-                    Text("You've made 3 mistakes.\nTime to try again!")
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.white.opacity(0.9))
-                        .padding(.horizontal)
-
-                    VStack(spacing: 16) {
-                        Button(action: onRestart) {
-                            Text("Restart Level")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .cornerRadius(12)
-                        }
-
-                        Button(action: onDismiss) {
-                            Text("Back to Grid")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.gray.opacity(0.4))
-                                .cornerRadius(12)
-                        }
-                    }
-                    .padding(.horizontal, 40)
-                    .padding(.top, 20)
-                }
-                .padding(32)
-                .background(Color("CardBackground").opacity(0.1)) // Subtle tint (ensure good contrast with black overlay)
-                .cornerRadius(24)
-                .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: 10)
-                // If using light mode only for overlay:
-                // .environment(\.colorScheme, .dark)
-            }
-        }
-    }
-
     // MARK: - Hint Button Component
     struct HintButtonView: View {
         @ObservedObject var gameViewModel: SudokuGameViewModel
