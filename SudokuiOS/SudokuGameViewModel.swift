@@ -1706,7 +1706,13 @@ class SudokuGameViewModel: ObservableObject {
         if isNonConsecutive || rules.contains(.nonConsecutive) {
             isVariantViolation = hasConsecutiveNeighbor(at: index, value: cell.value)
         }
-        
+
+        // 3. Odd-Even Parity Check (keep for all levels — custom levels have no solution to
+        // catch this via the check above)
+        if rules.contains(.oddEven) {
+            isVariantViolation = isVariantViolation || hasOddEvenConflict(at: index, value: cell.value)
+        }
+
         return isSolutionMismatch || isVariantViolation
     }
     
@@ -1958,7 +1964,11 @@ class SudokuGameViewModel: ObservableObject {
         if isNonConsecutive || rules.contains(.nonConsecutive) {
             if hasConsecutiveNeighbor(at: index, value: digit) { return false }
         }
-        
+
+        if rules.contains(.oddEven) {
+            if hasOddEvenConflict(at: index, value: digit) { return false }
+        }
+
         if rules.contains(.kropki) {
             if hasKropkiConflict(at: index, value: digit) { return false }
         }
@@ -2160,6 +2170,13 @@ class SudokuGameViewModel: ObservableObject {
         return false
     }
     
+    func hasOddEvenConflict(at index: Int, value: Int) -> Bool {
+        guard index < cells.count, let parity = cells[index].parity else { return false }
+        if parity == "1" { return value % 2 == 0 } // Circle: must be odd
+        if parity == "2" { return value % 2 != 0 } // Square: must be even
+        return false
+    }
+
     func hasKropkiConflict(at index: Int, value: Int) -> Bool {
         let row = index / 9
         let col = index % 9
