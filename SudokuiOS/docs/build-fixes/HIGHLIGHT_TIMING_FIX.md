@@ -44,7 +44,7 @@ private func finishBatchUpdate(checkWin: Bool = false, wasBoardFull: Bool = fals
 
 ## Solution
 
-Added immediate synchronization of `currentBoardArray` BEFORE calling `updateRestrictions()`:
+Added immediate synchronization of both `currentBoardArray` and `currentBoard` BEFORE calling `updateRestrictions()`:
 
 ```swift
 private func finishBatchUpdate(checkWin: Bool = false, wasBoardFull: Bool = false) {
@@ -64,8 +64,18 @@ private func finishBatchUpdate(checkWin: Bool = false, wasBoardFull: Bool = fals
 /// Synchronizes currentBoardArray with the current cell values immediately.
 /// This is critical for real-time highlighting calculations.
 private func syncCurrentBoardArray() {
+    var chars = [Character]()
+    chars.reserveCapacity(81)
+    
     for cell in cells {
         currentBoardArray[cell.id] = cell.value
+        chars.append(Character(String(cell.value)))
+    }
+    
+    // Also update currentBoard string to ensure isPlacementValid cache is invalidated
+    let newBoardString = String(chars)
+    if newBoardString != currentBoard {
+        currentBoard = newBoardString
     }
 }
 ```
@@ -74,8 +84,10 @@ private func syncCurrentBoardArray() {
 
 - **Cells (`[SudokuCellModel]`)** are the true source of truth, updated immediately when the user makes a move
 - **`currentBoardArray`** is a derived mirror used for performance-critical operations like highlighting calculations
-- The fix ensures `currentBoardArray` is synchronized with `cells` **before** any highlighting calculations run
-- The debounced `saveState()` still updates `currentBoardArray` again later (for the full save operation), but that's redundant now and doesn't cause timing issues
+- **`currentBoard`** is a string representation used for persistence and cache invalidation
+- The fix ensures both derived representations are synchronized with `cells` **before** any highlighting calculations run
+- Specifically, updating `currentBoard` invalidates the `isPlacementValid` cache (which uses `currentBoard.hashValue`), ensuring all validation checks use fresh data
+- The debounced `saveState()` still updates both fields again later (for the full save operation), but that's redundant now and doesn't cause timing issues
 
 ## Impact
 
@@ -87,12 +99,13 @@ private func syncCurrentBoardArray() {
 
 ## Related Code
 
-The highlighting calculation that depends on `currentBoardArray`:
+The highlighting calculation that depends on `currentBoardArray` and `currentBoard`:
 
-- `PotentialHighlightCalculator.calculatePotentials()` - calculates which cells should NOT be highlighted as potential placements
+- `PotentialHighlightCalculator.calculatePotentials()` - calculates which cells should NOT be highlighted as potential placements (uses `currentBoardArray` directly)
 - `SudokuGameViewModel.updateRestrictions()` - calls the calculator and stores results in `restrictedHighlightSet`
 - `SudokuGameViewModel.updatePointPairRestrictions()` - also uses the calculator for advanced highlighting features
 - `SudokuGameViewModel.getHighlightType()` - determines which highlight style to apply to each cell, using the restriction sets
+- `SudokuGameViewModel.isPlacementValid()` - validates if a digit can be placed at an index, using a cache keyed by `currentBoard.hashValue` (updating `currentBoard` invalidates this cache)
 
 All of these now work with synchronized, real-time board state.
 

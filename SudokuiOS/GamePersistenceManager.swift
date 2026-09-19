@@ -16,7 +16,7 @@ final class GamePersistenceManager {
     // MARK: - Debouncing
     
     private var saveTimer: Timer?
-    private var hasPendingSave: Bool = false
+    private(set) var hasPendingSave: Bool = false // Made visible for testing
     
     // MARK: - Initialization
     
@@ -41,15 +41,17 @@ final class GamePersistenceManager {
         saveTimer?.invalidate()
         
         saveTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
-            self?.performSave(
-                currentBoard: currentBoard,
-                notes: notes,
-                colors: colors,
-                crosses: crosses,
-                markedCombinations: markedCombinations,
-                markedKillerCombinations: markedKillerCombinations,
-                timeElapsed: timeElapsed
-            )
+            Task { @MainActor [weak self] in
+                self?.performSave(
+                    currentBoard: currentBoard,
+                    notes: notes,
+                    colors: colors,
+                    crosses: crosses,
+                    markedCombinations: markedCombinations,
+                    markedKillerCombinations: markedKillerCombinations,
+                    timeElapsed: timeElapsed
+                )
+            }
         }
     }
     
@@ -118,10 +120,11 @@ final class GamePersistenceManager {
     // MARK: - Load State
     
     func loadSavedState(for level: SudokuLevel) -> SavedGameState? {
-        guard let progress = level.userProgress,
-              let timeElapsed = level.timeElapsed as? Int else {
+        guard let progress = level.userProgress else {
             return nil
         }
+        
+        let timeElapsed = level.timeElapsed
         
         var notes: [Int: Set<Int>] = [:]
         var colors: [Int: Int] = [:]
@@ -183,22 +186,20 @@ final class GamePersistenceManager {
         isCustomLevel: Bool,
         customLevelId: String?,
         userBoard: String,
-        notesData: Data?,
-        colorData: Data?,
         timeElapsed: Int
     ) {
-        let session = GameSession(
-            levelID: levelID,
-            isCustomLevel: isCustomLevel,
-            customLevelId: customLevelId,
-            userBoard: userBoard,
-            notesData: notesData,
-            colorData: colorData,
-            timeElapsed: timeElapsed,
-            timestamp: Date().timeIntervalSince1970
-        )
+        // Store session info in UserDefaults for quick resume
+        let mode = isCustomLevel ? "custom" : "standard"
+        UserDefaults.standard.set(mode, forKey: "lastPlayedMode")
+        UserDefaults.standard.set(levelID, forKey: "lastUnfinishedLevelID")
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastPlayedTimestamp")
         
-        levelViewModel?.saveActiveSession(session: session)
+        if let uuid = customLevelId {
+            UserDefaults.standard.set(uuid, forKey: "lastCustomLevelUUID")
+        }
+        
+        // The actual session data is stored via saveLevelProgress
+        // which is called separately with full state
     }
     
     // MARK: - Cleanup

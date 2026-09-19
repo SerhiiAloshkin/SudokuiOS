@@ -254,6 +254,58 @@ struct OptimizationTests {
         }
     }
     
+    // MARK: - Phase 1 Optimization Tests
+    
+    @Test("Validation caching improves performance")
+    func validationCachingTest() {
+        let levelVM = LevelViewModel(modelContext: nil)
+        let gameVM = SudokuGameViewModel(levelID: 1, levelViewModel: levelVM)
+        
+        // First call - uncached
+        let start1 = Date()
+        for i in 0..<81 {
+            for digit in 1...9 {
+                _ = gameVM.isPlacementValid(digit, at: i)
+            }
+        }
+        let time1 = Date().timeIntervalSince(start1)
+        
+        // Second call - should hit cache
+        let start2 = Date()
+        for i in 0..<81 {
+            for digit in 1...9 {
+                _ = gameVM.isPlacementValid(digit, at: i)
+            }
+        }
+        let time2 = Date().timeIntervalSince(start2)
+        
+        // Cached should be significantly faster (or at least not slower)
+        #expect(time2 <= time1, "Cached validation should be at least as fast")
+        print("⏱️ Validation: Uncached=\(time1*1000)ms, Cached=\(time2*1000)ms (Speedup: \(time1/time2)x)")
+    }
+    
+    @Test("Save state debouncing reduces calls")
+    func saveStateDebounceTest() async throws {
+        let levelVM = LevelViewModel(modelContext: nil)
+        let gameVM = SudokuGameViewModel(levelID: 1, levelViewModel: levelVM)
+        
+        // Simulate rapid state changes
+        for i in 1...10 {
+            gameVM.selectedCellIndex = i
+            gameVM.handleNumberInput(i % 9 + 1)
+            gameVM.saveState() // Called 10 times rapidly
+        }
+        
+        // Should have pending save
+        #expect(gameVM.hasPendingSave == true, "Should have pending save")
+        
+        // Wait for debounce timer (2.5 seconds to be safe)
+        try await Task.sleep(nanoseconds: 2_500_000_000)
+        
+        // Should have completed by now
+        #expect(gameVM.hasPendingSave == false, "Save should have completed")
+    }
+    
     // MARK: - Data Integrity Tests
     
     @Test("Save and load preserve game state")

@@ -21,7 +21,8 @@ struct OptimizedPotentialHighlightCalculator {
         }
         
         // Clear and rebuild
-        constraintGraph.removeAll(minimumCapacity: 81)
+        constraintGraph.removeAll()
+        constraintGraph.reserveCapacity(81)
         graphBoardHash = boardHash
         graphRules = rules
         

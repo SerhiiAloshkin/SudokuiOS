@@ -1,6 +1,7 @@
 import Testing
+import Testing
 import Foundation
-@testable import YourAppModule // Replace with your actual module name
+@testable import SudokuiOS
 
 @Suite("Sequential Level Unlocking Tests")
 struct SequentialUnlockTests {
