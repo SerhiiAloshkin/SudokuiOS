@@ -41,7 +41,7 @@ struct LevelBuilderView: View {
                     footnote: message.footnote,
                     action: {
                         withAnimation {
-                            if message.message == "Saved successfully!" || message.message == "Updated successfully!" {
+                            if message.message == "Level saved successfully!" || message.message == "Updated successfully!" {
                                 navigationStack.removeLast()
                             }
                             viewModel.activeMessage = nil

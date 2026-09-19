@@ -7,7 +7,9 @@ struct LevelPreviewModal: View {
     // Actions needed to trigger navigation from Parent
     var onPlay: () -> Void
     var onCancel: () -> Void
-    
+
+    @State private var showRestartConfirmation = false
+
     var body: some View {
         ZStack {
             VStack(spacing: 20) {
@@ -132,8 +134,7 @@ struct LevelPreviewModal: View {
                     } else if level.isSolved {
                         // Solved -> Show "Play Again" (Restart) logic
                         Button(action: {
-                            viewModel.resetLevelProgress(levelID: level.id)
-                            onPlay() // Navigate directly without ad
+                            showRestartConfirmation = true
                         }) {
                             Text("Restart Level")
                                 .font(.headline)
@@ -171,7 +172,16 @@ struct LevelPreviewModal: View {
                 .padding(.horizontal, 40)
                 .padding(.bottom, 20)
             }
-            
+
+        }
+        .alert("Restart Level?", isPresented: $showRestartConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Restart", role: .destructive) {
+                viewModel.resetLevelProgress(levelID: level.id)
+                onPlay() // Navigate directly without ad
+            }
+        } message: {
+            Text("This will clear your time, notes, and progress on this level. Your best time is kept.")
         }
     } // Close body
     

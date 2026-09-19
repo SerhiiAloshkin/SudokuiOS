@@ -5,7 +5,10 @@ struct CustomLevelsListView: View {
     @Binding var navigationStack: [MainMenuView.SudokuRoute]
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CustomSudokuLevel.createdAt, order: .reverse) private var levels: [CustomSudokuLevel]
-    
+
+    @State private var levelPendingDeletion: CustomSudokuLevel? = nil
+    @State private var showDeleteConfirmation = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -54,8 +57,8 @@ struct CustomLevelsListView: View {
                                     }
                                     
                                     Button(role: .destructive) {
-                                        modelContext.delete(level)
-                                        try? modelContext.save()
+                                        levelPendingDeletion = level
+                                        showDeleteConfirmation = true
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
@@ -79,6 +82,15 @@ struct CustomLevelsListView: View {
             }
         }
         .navigationBarHidden(true)
+        .alert("Delete Level?", isPresented: $showDeleteConfirmation, presenting: levelPendingDeletion) { level in
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                modelContext.delete(level)
+                try? modelContext.save()
+            }
+        } message: { level in
+            Text("\"\(level.levelName)\" will be permanently deleted. This cannot be undone.")
+        }
     }
     
     @ViewBuilder
