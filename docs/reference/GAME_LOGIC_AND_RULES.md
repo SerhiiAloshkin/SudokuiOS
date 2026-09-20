@@ -14,7 +14,7 @@ from an in-progress refactor.
 
 ## 0. Live vs. Dead Code (read this first)
 
-**CORRECTION (2026-09-19):** a prior version of this table (and `docs/ad-removal/PHASE1_CLEANUP.md`)
+**CORRECTION (2026-09-19):** a prior version of this table (and `docs/archive/ad-removal/PHASE1_CLEANUP.md`)
 claimed 6 dead files were deleted in a "Phase 1 cleanup." That claim was **false** — verified by
 direct filesystem check, 5 of the 6 still existed on disk at that time. Only `HintSystemManager.swift`
 is actually deleted now, and that happened today as part of ad-IAP removal (it carried a
@@ -37,7 +37,7 @@ The repo previously contained a set of "manager" classes that looked like a clea
 | `OptimizedPotentialHighlightCalculator.swift` | **DEAD, still present** | Zero call sites, incomplete even internally. Safe to delete but not yet done. |
 | `HumanLogicSolver.swift` | **LIVE, narrow scope** | Only used by the Level Builder's "is this solvable" check (§2.1), not for in-game hints/highlights. |
 | `PointingPairsSolver.swift` (incl. nested `SandwichSolver`) | **Present, unclear if wired** | Duplicates constraint logic found elsewhere. No confirmed call site found — verify before relying on or modifying it. |
-| `StoreManager.swift`, `EnvironmentConfig.swift`, `NetworkMonitor.swift` | **DELETED (2026-09-19)** | Ad-SDK/IAP remnants — see `CLAUDE.md` "Ad SDK Removal". |
+| `StoreManager.swift`, `EnvironmentConfig.swift`, `NetworkMonitor.swift` | **DELETED (2026-09-19)** | Ad-SDK/IAP remnants — see `CLAUDE-status.md` "Ad SDK Removal". |
 
 **Why this matters:** if a future task is "improve the hint system" or "speed up highlighting,"
 the correct file to touch is `SudokuGameViewModel.swift` / `PotentialHighlightCalculator.swift`.
@@ -321,7 +321,7 @@ future refactor here has no regression-test safety net today.
 - **Cooldown: hard-coded 5 minutes (300s)**, stored as a `Date` in
   `UserDefaults["nextHintAvailableDate"]`, ticked down once/second in the view model for display.
   **No ad or IAP gating exists in this path at all** — hints are already fully ad-free apart from
-  the flat cooldown. (Relevant to the ad-removal task in the main CLAUDE.md: this part is already
+  the flat cooldown. (Relevant to the ad-removal task in `CLAUDE-status.md`: this part is already
   done, despite that doc describing hints as ad-gated — that description is stale.)
 - **No per-level hint limit** beyond the cooldown; a player can use unlimited hints, 5 minutes
   apart, until the puzzle is solved or game-over.
@@ -350,7 +350,7 @@ future refactor here has no regression-test safety net today.
 ### 3.2 Sequential unlock algorithm — `LevelViewModel.recalculateLocks` (`LevelViewModel.swift`)
 
 **UPDATE (2026-09-19):** the "Remove Ads" IAP and its unlock-everything side effect were removed
-entirely (a deliberate product decision, not just ad-SDK dead-code cleanup — see `CLAUDE.md`'s
+entirely (a deliberate product decision, not just ad-SDK dead-code cleanup — see `CLAUDE-status.md`'s
 "Ad SDK Removal" section). `recalculateLocks` no longer takes a `hasRemovedAds` parameter.
 Only two unlock paths remain: the debug override and normal sequential progression.
 
@@ -394,7 +394,7 @@ marks/cross snapshot data and a `moves: [MoveHistory]` relationship (cascade del
   SwiftData flag), `"devAllUnlocked"` (debug override), plus session-resume keys
   (`"active_standard_session"`, `"active_custom_session"`, `"lastPlayedMode"`,
   `"lastCustomLevelUUID"`, etc.). `"isAdsRemoved"` no longer exists — removed 2026-09-19 along
-  with the rest of the "Remove Ads" IAP (see §3.2 and `CLAUDE.md`).
+  with the rest of the "Remove Ads" IAP (see §3.2 and `CLAUDE-status.md`).
 
 ### 3.4 Custom Level Builder — no hard validation gate on save
 
@@ -681,7 +681,7 @@ no separate game-logic path for custom levels.
   `LevelViewModel.hasRemovedAds`, the `"isAdsRemoved"` UserDefaults key, and unlock rule that read
   it). **No unlock-everything path remains except the debug override** — levels only unlock via
   normal sequential progression now. Existing "Remove Ads" purchasers lose that unlock benefit;
-  this was confirmed, not assumed. See `CLAUDE.md` for the authoritative current-status summary.
+  this was confirmed, not assumed. See `CLAUDE-status.md` for the authoritative current-status summary.
 
 ---
 
