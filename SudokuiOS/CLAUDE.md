@@ -172,12 +172,20 @@ much reactivity plumbing was added):**
   custom title, followed by the rule name") uses `Text` concatenation (`Text(...) + Text(...)`)
   so each half resolves independently and correctly — see `SudokuGameView.swift`'s
   `SudokuPauseOverlayView.titleText` for a worked example.
-- **One known, unfixed gap**: `SettingsView.swift`'s mail-support `subject`/`messageBody` (passed
-  to `MFMailComposeViewController`, a UIKit API taking a plain `String`, not `Text`) still go
-  through `localized(_:)`, so they may not honor the in-app override. Fixing this needs a
-  `Bundle`-based lookup (finding the target language's `.lproj` and reading `NSLocalizedString`
-  from it directly) since `LocalizedStringKey` doesn't apply outside SwiftUI — not yet done, low
-  priority since it's rarely seen (only shown when composing a support email).
+- **A plain `String` needed outside SwiftUI** (where `LocalizedStringKey` doesn't apply at all)
+  uses `localizedFormat(_:)` (`LocalizationManager.swift`) instead of `localized(_:)` —
+  a `Bundle`-based lookup (finds the target language's `.lproj`, reads the format string via the
+  classic `Bundle.localizedString(forKey:value:table:)` API, a different code path than the
+  broken `String(localized:locale:)`) — pass its result to `String(format:)` with the
+  interpolated arguments. Used for `LevelBuilderViewModel`'s default custom-level name
+  (`"Level %lld"`, pre-filled into an editable text field before the user renames it). Falls back
+  to the untranslated English key if the target bundle can't be found — a safe, no-worse-than-
+  before fallback, not a crash.
+- **One remaining known gap**: `SettingsView.swift`'s mail-support `subject`/`messageBody`
+  (passed to `MFMailComposeViewController`) still use `localized(_:)` (the broken
+  explicit-locale path), not yet migrated to `localizedFormat(_:)`. Low priority — only seen when
+  composing a support email — but if picked up, follow the same pattern as
+  `LevelBuilderViewModel` above.
 - `NavigationStack`'s native nav-bar title has a **separate, unrelated** staleness quirk: even
   though it's a plain literal (`.navigationTitle("Settings")`, correctly environment-driven), the
   underlying UIKit title view doesn't reliably re-read it on a plain re-render. Fixed by pinning

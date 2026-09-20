@@ -493,7 +493,7 @@ class LevelBuilderViewModel: ObservableObject {
         if pendingLevelName.trimmingCharacters(in: .whitespaces).isEmpty {
             let descriptor = FetchDescriptor<CustomSudokuLevel>()
             let existingCount = (try? context.fetchCount(descriptor)) ?? 0
-            pendingLevelName = "Level \(existingCount + 1)"
+            pendingLevelName = String(format: localizedFormat("Level %lld"), existingCount + 1)
         }
         
         showSaveNamePrompt = true
@@ -506,7 +506,7 @@ class LevelBuilderViewModel: ObservableObject {
         if name.isEmpty {
             let descriptor = FetchDescriptor<CustomSudokuLevel>()
             let existingCount = (try? context.fetchCount(descriptor)) ?? 0
-            name = "Level \(existingCount + 1)"
+            name = String(format: localizedFormat("Level %lld"), existingCount + 1)
         }
         
         // If editing, update existing version
