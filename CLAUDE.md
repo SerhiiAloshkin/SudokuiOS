@@ -6,7 +6,7 @@ Killer, Kropki, Odd-Even, Knight's-move, King's-move, Non-Consecutive — combin
 level). 600 campaign levels plus a user-facing Level Builder for custom puzzles. Fully ad-free
 (no ad SDK, no IAP). Localized into English, French, and Ukrainian.
 
-**Stack:** Swift + SwiftUI · iOS 17+ · SwiftData · `@Observable` · MVVM
+**Stack:** Swift + SwiftUI · iOS 26.1 deployment target · SwiftData · `@Observable` · MVVM
 
 ## Repo layout
 This folder is the git root and the Xcode project root. The two folders named `SudokuiOS` are
@@ -18,6 +18,7 @@ SudokuiOS/                     ← repo root (you are here): .git, SudokuiOS.xco
 │   ├── *.swift, Levels.json, Localizable.xcstrings, Assets.xcassets, Info.plist
 │   └── SudokuiOSTests/        ← 12 XCTest files that are NOT wired in (see "Command line")
 ├── SudokuiOSTests/            ← the actual SudokuiOSTests target folder (what `xcodebuild test` runs)
+├── SudokuiOSUITests/          ← XCUITest target: taps through the real app in the simulator
 ├── docs/                      ← reference/ (durable), archive/ (historical logs)
 ├── CLAUDE.md, CLAUDE-*.md     ← Claude instructions (this file + topic files)
 └── Package.swift, logical_solver.py, test_logical_solver.py, run_sandwich_test.py,
@@ -37,12 +38,18 @@ open SudokuiOS.xcodeproj      # scheme: SudokuiOS
 ```
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 DEST='platform=iOS Simulator,name=iPhone 17 Pro'
-xcodebuild -project SudokuiOS.xcodeproj -scheme SudokuiOS -destination "$DEST" build
-xcodebuild -project SudokuiOS.xcodeproj -scheme SudokuiOS -destination "$DEST" -parallel-testing-enabled NO test
-# one suite:  ... test -only-testing:SudokuiOSTests/SequentialUnlockTests   (Target/Suite[/test])
+XB="xcodebuild -project SudokuiOS.xcodeproj -scheme SudokuiOS -destination \"$DEST\""
+eval $XB build
+eval $XB -parallel-testing-enabled NO test                                        # everything, ~2 min
+eval $XB -parallel-testing-enabled NO test -skip-testing:SudokuiOSUITests         # unit tests only, ~20 s
+eval $XB -parallel-testing-enabled NO test -only-testing:SudokuiOSUITests         # UI tests only
+# one suite/test (Target/Suite[/test]):
+#   -only-testing:SudokuiOSTests/SequentialUnlockTests
+#   -only-testing:SudokuiOSUITests/SudokuiOSUITests/testEnterCorrectDigitThenUndo
 ```
 - Use `-parallel-testing-enabled NO`: parallel runs boot cloned simulators.
-- **What `test` actually runs (verified 2026-09-20: passes, ~10 tests):** the `SudokuiOSTests` target's
+- A benign `xcrun: error: unable to find utility "simctl"` line at the end of a run is xcodebuild's own diagnostics collection; ignore it.
+- **What the unit-test target actually runs (verified 2026-09-20: passes, ~10 tests):** the `SudokuiOSTests` target's
   folder is the **repo-root** `SudokuiOSTests/` (`SudokuLayoutTests.swift`, plus a not-yet-committed
   `SudokuiOSTests.swift`), plus `SudokuiOS/SequentialUnlockTests.swift` (pulled in by a
   membership exception in the project). The 12 files in `SudokuiOS/SudokuiOSTests/` and the other
@@ -67,10 +74,35 @@ xcrun simctl terminate "$SIM" versa.SudokuiOS
 xcrun simctl uninstall "$SIM" versa.SudokuiOS              # wipes SwiftData/UserDefaults for a fresh start
 xcrun simctl ui "$SIM" appearance dark                     # or light
 ```
-`simctl` can launch, screenshot, reset data and switch appearance, but it **cannot tap**. Getting past
-the splash into the menu/game needs an XCUITest target (none exists yet — Plateful has one, with
-launch arguments such as `--in-memory-store`). Until then, screenshots cover launch/splash only.
+`simctl` can launch, screenshot, reset data and switch appearance, but it **cannot tap**. Tapping is
+done with XCUITest (below). `simctl uninstall` only works while the simulator is booted.
 Save screenshots and scratch files outside the repo (or in `build/`) — never in `SudokuiOS/`.
+
+### Tap through the app (UI tests)
+`SudokuiOSUITests/SudokuiOSUITests.swift` launches the real app and taps through it: main menu →
+Play Campaign → level 1 → Start/Continue Level → game board, enters and undoes a digit, opens
+Settings. Run it with the `-only-testing:SudokuiOSUITests` command above (~1–2 min; the game screen
+is slow to drive — likely the running timer keeps the app from going idle — so keep flows short).
+
+The app has **no accessibility identifiers, launch arguments or in-memory store**, so the tests are
+label-driven and share the simulator's real SwiftData store between runs:
+- Find controls by visible **English** label (`app.buttons["Play Campaign"]`) or SF Symbol
+  identifier (`app.buttons["gearshape.fill"]`). Board cells are *not* elements — tap them by
+  coordinate (see `cell(row:col:)`); the number pad and toolbar (`Undo`, `Erase`, `Pause`…) are buttons.
+- Tests must leave state as they found it and tolerate leftovers ("Continue Level" instead of
+  "Start Level", a digit already in a cell). To start from scratch: boot the sim, then
+  `xcrun simctl uninstall "$SIM" versa.SudokuiOS`.
+- Campaign **level 1 is fixed** (`Levels.json`), so tests can use its known givens/solution.
+- Tapping an already-selected cell deselects it, and a number-pad tap with nothing selected only
+  shows placement highlights — select a cell once, then tap the digit.
+- Don't add accessibility identifiers or launch arguments unasked (source-code change); if a test
+  keeps needing a hack around this, propose adding them.
+
+**Exploring an unfamiliar screen:** write a throwaway XCUITest that navigates there and
+`print(app.debugDescription)` (dumps every element with label, identifier, frame, enabled state),
+plus `try app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "<scratchpad>/x.png"))`
+and Read the PNG. Filter the log with `grep -E "^ *(Button|StaticText|NavigationBar),"`, then delete
+the throwaway test.
 
 ## Architecture
 **Pattern**: MVVM
@@ -126,10 +158,12 @@ with file:line). If you can't compile, say so ("I can't verify this builds — p
 **Testing**: new logic (validation, calculations, game rules, state transitions, persistence)
 needs a unit test; bug fixes need a regression test. Prefer Swift Testing (`@Test`/`#expect`)
 for new tests; existing XCTest suites stay as-is. Don't test SwiftUI layout directly or trivial
-getters/setters. Tests must be deterministic, isolated, and fast (<1s). Put new tests in the
-repo-root `SudokuiOSTests/` (the target's real folder) — **not** in `SudokuiOS/` or
+getters/setters. Tests must be deterministic, isolated, and fast (<1s). Put new unit tests in
+the repo-root `SudokuiOSTests/` (the target's real folder) — **not** in `SudokuiOS/` or
 `SudokuiOS/SudokuiOSTests/`, where they compile into the app and never run. Run them and confirm
-they appear in the `xcodebuild test` output.
+they appear in the `xcodebuild test` output. UI flows go in `SudokuiOSUITests/`. After changing UI
+(navigation, button labels, screens), run the UI tests — they are the only check that the real app
+still launches and can be tapped through.
 
 **Other standing rules**:
 - Ask before changing core Sudoku validation/generation/hint algorithms in `SudokuGameViewModel`
@@ -157,7 +191,7 @@ solver (`logical_solver.py`, `test_logical_solver.py`, `run_sandwich_test.py`), 
 Verify a folder is wired into the scheme before assuming its tests run.
 
 ## Quick facts
-- iOS 17+ (`@Observable`, SwiftData, modern SwiftUI)
+- Deployment target iOS 26.1 (`IPHONEOS_DEPLOYMENT_TARGET` in the project; older docs said iOS 17+)
 - Persistence: SwiftData for levels/progress/custom levels; UserDefaults for simple flags and
   session-resume pointers
 - 600 campaign levels (`Levels.json`): ids 1–250 single-variant cycling through all 10 rule types,

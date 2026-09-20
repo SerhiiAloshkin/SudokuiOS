@@ -41,6 +41,17 @@
                ReferencedContainer = "container:SudokuiOS.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "52A99510305D0000009074AB"
+               BuildableName = "SudokuiOSUITests.xctest"
+               BlueprintName = "SudokuiOSUITests"
+               ReferencedContainer = "container:SudokuiOS.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
