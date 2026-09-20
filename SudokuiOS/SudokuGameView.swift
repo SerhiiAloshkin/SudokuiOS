@@ -463,15 +463,19 @@ extension SudokuGameView {
         @Binding var showRestartAlert: Bool
         @Environment(\.dismiss) var dismiss
 
-        // gameViewModel.levelTitle mixes verbatim user content (a custom level's own title)
-        // with catalog-key fallback text ("Level N" / "Custom Level") — only wrap the latter in
-        // LocalizedStringKey so SwiftUI's environment-locale lookup translates it; user content
-        // must stay verbatim.
+        // Built directly from Text(...) literals/interpolation rather than wrapping the
+        // already-interpolated gameViewModel.levelTitle String in LocalizedStringKey(...) — a
+        // pre-substituted runtime value like "Level 5" doesn't match the catalog's format-key
+        // ("Level %lld") and would silently fall back to raw English for every level number.
+        // User content (a custom level's own title) stays verbatim.
         private var titleText: Text {
-            if gameViewModel.isCustomLevel, let custom = gameViewModel.customLevelTitle {
-                return Text(verbatim: custom)
+            if gameViewModel.isCustomLevel {
+                if let custom = gameViewModel.customLevelTitle {
+                    return Text(verbatim: custom)
+                }
+                return Text("Custom Level")
             }
-            return Text(LocalizedStringKey(gameViewModel.levelTitle))
+            return Text("Level \(gameViewModel.levelID)")
         }
 
         var body: some View {
