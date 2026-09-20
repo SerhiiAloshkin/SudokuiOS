@@ -127,6 +127,14 @@ struct SettingsView: View {
                     ))
                 }
                 #endif
+
+                Section {
+                    Text(verbatim: "© 2026 Serhii Aloshkin")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .listRowBackground(Color.clear)
             }
             .navigationTitle("Settings")
             .toolbar {

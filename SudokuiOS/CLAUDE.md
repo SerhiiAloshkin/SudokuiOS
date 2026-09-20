@@ -113,9 +113,14 @@ parallel; don't trust a `docs/ad-removal/*.md` status report over the actual cod
   `SudokuiOSTests/LevelManagerTests.swift`) still reference the now-fully-removed
   `isAdUnlocked`/`unlockLevelViaAd` — not newly broken by this change, but now doubly stale; see
   `docs/reference/CODE_MAP.md` §4.
-- Remove the `GoogleMobileAds` SPM dependency from the Xcode project itself (`project.pbxproj`
-  package references) — this is the one piece that can't be done from a text-editing pass; needs
-  Xcode or manual `.pbxproj` surgery.
+- The `GoogleMobileAds` SPM dependency is removed from the Xcode project itself
+  (`project.pbxproj`'s `PBXBuildFile`, `PBXFrameworksBuildPhase`, `packageProductDependencies`,
+  `packageReferences`, `XCRemoteSwiftPackageReference`, and `XCSwiftPackageProductDependency`
+  entries) — done via manual `.pbxproj` surgery (validated with `plutil -lint`). **Note**:
+  `project.pbxproj` is `.gitignore`'d in this repo, so this change is real and live on disk but
+  will never show up in `git status`/diffs — don't assume it's undone just because it's absent
+  from a commit. Ad SDK removal is now fully complete, including the project-file cleanup that
+  was previously the one remaining piece.
 
 ## Localization
 
