@@ -58,7 +58,7 @@ struct SudokuGameView: View {
             } message: {
                 Text("This will clear all your progress.")
             }
-            .alert(gameViewModel.hintErrorMessage, isPresented: $gameViewModel.showHintErrorAlert) {
+            .alert(LocalizedStringKey(gameViewModel.hintErrorMessage), isPresented: $gameViewModel.showHintErrorAlert) {
                 Button("OK", role: .cancel) { }
             }
             .alert("Mistakes Found", isPresented: $gameViewModel.showCustomBoardError) {
@@ -462,7 +462,18 @@ extension SudokuGameView {
         @ObservedObject var gameViewModel: SudokuGameViewModel
         @Binding var showRestartAlert: Bool
         @Environment(\.dismiss) var dismiss
-        
+
+        // gameViewModel.levelTitle mixes verbatim user content (a custom level's own title)
+        // with catalog-key fallback text ("Level N" / "Custom Level") — only wrap the latter in
+        // LocalizedStringKey so SwiftUI's environment-locale lookup translates it; user content
+        // must stay verbatim.
+        private var titleText: Text {
+            if gameViewModel.isCustomLevel, let custom = gameViewModel.customLevelTitle {
+                return Text(verbatim: custom)
+            }
+            return Text(LocalizedStringKey(gameViewModel.levelTitle))
+        }
+
         var body: some View {
             ZStack {
                 // Dimmed Background
@@ -487,7 +498,7 @@ extension SudokuGameView {
                             .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundColor(Color("ThemeBlue"))
                         
-                        Text("\(gameViewModel.levelTitle) • \(gameViewModel.ruleType?.displayName ?? "Sudoku")")
+                        (titleText + Text(" • ") + Text(LocalizedStringKey(gameViewModel.ruleType?.displayName ?? "Sudoku")))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -649,7 +660,9 @@ extension SudokuGameView {
                 VStack(spacing: 4) {
                     HStack(alignment: .center, spacing: 8) {
                         if gameViewModel.isCustomLevel {
-                            Text(gameViewModel.customLevelTitle ?? "Custom Level")
+                            // customLevelTitle is verbatim user content when set; only the
+                            // fallback is a translatable catalog key.
+                            (gameViewModel.customLevelTitle.map { Text(verbatim: $0) } ?? Text("Custom Level"))
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
                                 .foregroundColor(Color("ThemeBlue"))
                         } else {

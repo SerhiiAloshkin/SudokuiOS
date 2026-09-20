@@ -22,7 +22,7 @@ struct SettingsView: View {
     private let supportEmail = "help.sudokuversa@gmail.com"
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Highlight Mode")) {
                     Toggle("Minimal Highlight", isOn: $settings.isMinimalHighlight)
@@ -93,6 +93,13 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
+
+                    Picker("Language", selection: $settings.appLanguage) {
+                        ForEach(AppLanguage.allCases, id: \.self) { language in
+                            Text(language.text).tag(language)
+                        }
+                    }
+                    .pickerStyle(.menu)
                 }
                 
                 Section(header: Text("Support")) {
@@ -147,7 +154,7 @@ struct SettingsView: View {
                 MailView(
                     result: $mailResult,
                     recipients: [supportEmail],
-                    subject: "Sudoku Versa Feedback",
+                    subject: localized("Sudoku Versa Feedback"),
                     messageBody: supportEmailBody
                 )
             }
@@ -160,8 +167,13 @@ struct SettingsView: View {
                 Text("Your device is not configured to send emails. Please contact us at \(supportEmail).")
             }
         }
+        // Applied to the whole NavigationStack (not just the Form/navigationTitle) so the
+        // native UIKit nav-bar chrome is torn down and rebuilt atomically on language change —
+        // pinning .id() only on an inner modifier left the title one step behind (see
+        // CLAUDE.md's Localization section).
+        .id(settings.appLanguage)
     }
-    
+
     // MARK: - Email Support Help
     private var supportEmailBody: String {
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
@@ -169,16 +181,16 @@ struct SettingsView: View {
         let iosVersion = UIDevice.current.systemVersion
         let deviceModel = UIDevice.current.modelIdentifier
         
-        return """
-        
-        
-        
+        return localized("""
+
+
+
         ---------------------------------
         Technical details for support:
         App Version: \(appVersion) (\(buildNumber))
         iOS Version: \(iosVersion)
         Device Model: \(deviceModel)
-        """
+        """)
     }
 }
 

@@ -4,14 +4,20 @@ struct SudokuRuleTagView: View {
     let rule: SudokuRuleType
     let isCompact: Bool
     var showColor: Bool = true
-    
     var body: some View {
         HStack(spacing: 4) {
             ruleIcon
-            
+
             if !isCompact {
-                Text(rule.shortName.uppercased())
+                // rule.shortName is a plain English catalog key (see SudokuRuleType.swift) —
+                // wrapping it in LocalizedStringKey (not passing it to Text(_:) directly) makes
+                // SwiftUI resolve it against the current .environment(\.locale) automatically,
+                // the one mechanism confirmed to actually track the in-app language switcher.
+                // .textCase(.uppercase) uppercases the rendered text instead of the raw key, so
+                // it still works correctly after translation.
+                Text(LocalizedStringKey(rule.shortName))
                     .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .textCase(.uppercase)
             }
         }
         .padding(.horizontal, isCompact ? 5 : 6)

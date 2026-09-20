@@ -2518,6 +2518,9 @@ class SudokuGameViewModel: ObservableObject {
         let seconds = timeElapsed % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
+    // Plain English (not localized(_:)) — kept as String since tests compare it directly
+    // (SudokuGameViewModelTests) and it mixes verbatim user content (customLevelTitle) with a
+    // catalog-key fallback. Display sites wrap the non-custom-title parts in LocalizedStringKey.
     var levelTitle: String {
         if isCustomLevel {
             return customLevelTitle ?? "Custom Level"

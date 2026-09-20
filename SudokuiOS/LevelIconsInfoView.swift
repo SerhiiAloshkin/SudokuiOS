@@ -4,7 +4,7 @@ struct LevelIconsInfoView: View {
     @Environment(\.dismiss) var dismiss
     
     // Legend Data
-    private let legends: [(icon: String, title: String, description: String)] = [
+    private let legends: [(icon: String, title: LocalizedStringKey, description: LocalizedStringKey)] = [
         ("square.grid.3x3.fill", "Classic Sudoku", "Standard 9x9 Sudoku grid."),
         ("squareshape.split.2x2", "Non-Consecutive", "Adjacent cells cannot contain consecutive numbers."),
         ("square.stack.3d.up", "Sandwich Sudoku", "Clues indicate sums between 1 and 9."),
@@ -18,10 +18,10 @@ struct LevelIconsInfoView: View {
     ]
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section(header: Text("Game Types")) {
-                    ForEach(legends, id: \.title) { item in
+                    ForEach(legends, id: \.icon) { item in
                         HStack(spacing: 16) {
                             Group {
                                 if item.icon == "kropki_icon" {

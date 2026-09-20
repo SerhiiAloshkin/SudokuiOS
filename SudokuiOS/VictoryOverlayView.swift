@@ -11,7 +11,7 @@ struct VictoryOverlayView: View {
     let isCustomLevel: Bool
     let onNextLevel: () -> Void
     let onDismiss: () -> Void
-    
+
     // Animation State
     @State private var showContent = false
     @State private var scale: CGFloat = 0.8
@@ -37,8 +37,10 @@ struct VictoryOverlayView: View {
                 }
             
             VStack(spacing: 30) {
-                // 2. Title "Masterful!"
-                Text(praiseWord)
+                // 2. Title "Masterful!" — praiseWord is a runtime String (picked from praiseWords),
+                // so it needs explicit LocalizedStringKey wrapping to look up the translation
+                // (unlike a literal Text("...") call, which does this automatically).
+                Text(LocalizedStringKey(praiseWord))
                     .font(.system(size: 40, weight: .black, design: .rounded))
                     .foregroundStyle(
                         LinearGradient(
@@ -120,7 +122,7 @@ struct VictoryOverlayView: View {
                                     .font(.headline)
                                     .fontWeight(.bold)
                                     .foregroundColor(.primary)
-                                Text(nextLevelVariant.displayName)
+                                Text(LocalizedStringKey(nextLevelVariant.displayName))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

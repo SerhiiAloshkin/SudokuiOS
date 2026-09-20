@@ -25,6 +25,26 @@ enum LevelFilter: String, CaseIterable {
         }
         return .all
     }
+
+    // Plain English catalog key, not run through localized(_:) — see SudokuRuleType.displayName's
+    // comment. Display sites must wrap this in LocalizedStringKey(...), not pass it to Text(_:).
+    var text: String {
+        switch self {
+        case .all: return "All Levels"
+        case .solved: return "Solved"
+        case .unsolved: return "Unsolved"
+        case .classic: return "Classic"
+        case .nonConsecutive: return "Non-Consecutive"
+        case .sandwich: return "Sandwich"
+        case .thermo: return "Thermo"
+        case .arrow: return "Arrow"
+        case .killer: return "Killer"
+        case .kropki: return "Kropki"
+        case .oddEven: return "Odd-Even"
+        case .knight: return "Knight"
+        case .king: return "King"
+        }
+    }
 }
 
 class LevelSelectionViewModel: ObservableObject {

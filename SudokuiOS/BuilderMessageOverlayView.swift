@@ -2,17 +2,24 @@ import SwiftUI
 
 struct BuilderMessage: Identifiable {
     let id = UUID()
-    let title: String
-    let message: String
-    let footnote: String?
-    var buttonTitle: String = "OK"
+    // LocalizedStringKey (not String via localized(_:)) so display resolves through SwiftUI's
+    // own environment-locale-driven catalog lookup — the only mechanism confirmed to actually
+    // track the in-app language switcher. These are display-only, never compared/manipulated.
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey
+    let footnote: LocalizedStringKey?
+    var buttonTitle: LocalizedStringKey = "OK"
+    /// Whether dismissing this message should navigate back to the previous screen
+    /// (e.g. after a successful save). Decoupled from the display text itself so it
+    /// doesn't depend on comparing localized strings.
+    var shouldNavigateBack: Bool = false
 }
 
 struct BuilderMessageOverlayView: View {
-    let title: String
-    let message: String
-    let footnote: String?
-    var buttonTitle: String = "OK"
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey
+    let footnote: LocalizedStringKey?
+    var buttonTitle: LocalizedStringKey = "OK"
     let action: () -> Void
     
     @State private var animateIn = false

@@ -1,6 +1,7 @@
 import SwiftData
 import Foundation
 import Observation
+import SwiftUI
 
 enum HighlightMode: String, CaseIterable, Codable {
     case restriction = "restriction" // A: Highlights same numbers and 3x3 box
@@ -11,8 +12,11 @@ enum MistakeMode: String, CaseIterable, Codable {
     case never = "never"
     case onFull = "onFull"
     case immediate = "immediate"
-    
-    var text: String {
+
+    // LocalizedStringKey (not String via localized(_:)) — display-only, resolved through
+    // SwiftUI's own environment-locale-driven catalog lookup, the only mechanism confirmed to
+    // actually track the in-app language switcher.
+    var text: LocalizedStringKey {
         switch self {
         case .never: return "Never"
         case .onFull: return "When Board Full"
@@ -24,8 +28,8 @@ enum MistakeMode: String, CaseIterable, Codable {
 enum HintTarget: String, CaseIterable, Codable {
     case selectedCell = "selectedCell"
     case randomCell = "randomCell"
-    
-    var text: String {
+
+    var text: LocalizedStringKey {
         switch self {
         case .selectedCell: return "Selected Cell"
         case .randomCell: return "Random Cell"
@@ -51,7 +55,8 @@ final class AppSettings {
     var isAutoFilterCombinationsEnabled: Bool = false // Default Off
     var hintTargetRaw: String = "selectedCell" // Default Selected Cell
     var appThemeRaw: String = "light" // Default Light
-    
+    var languageCodeRaw: String = "system" // Default: follow device language
+
     init(isMinimalHighlight: Bool = true, highlightMode: HighlightMode = .restriction, isTimerVisible: Bool = true, isHighlightSameNumberEnabled: Bool = true, isHighlightSameNoteEnabled: Bool = true, showMistakes: Bool = true, mistakeMode: MistakeMode = .onFull, hasSeenPotentialWarning: Bool = false, hasSeenMultiSelectHighlightNote: Bool = false, hasSeenTutorial: Bool = false, isDisableCompletedDigitsEnabled: Bool = true, isCombinationHelperEnabled: Bool = true, isAutoFilterCombinationsEnabled: Bool = false, hintTarget: HintTarget = .selectedCell, theme: AppTheme = .light) {
         self.isMinimalHighlight = isMinimalHighlight
         self.highlightModeRaw = highlightMode.rawValue
@@ -118,18 +123,56 @@ final class AppSettings {
         get { AppTheme(rawValue: appThemeRaw) ?? .light }
         set { appThemeRaw = newValue.rawValue }
     }
+
+    var appLanguage: AppLanguage {
+        get { AppLanguage(rawValue: languageCodeRaw) ?? .system }
+        set {
+            languageCodeRaw = newValue.rawValue
+            // Keep the ViewModel/Model-layer localized(_:) helper in sync immediately, so a
+            // language change applies right away rather than only on next launch.
+            LocalizationManager.shared.currentLocale = newValue.locale ?? .autoupdatingCurrent
+        }
+    }
 }
 
 enum AppTheme: String, CaseIterable, Codable {
     case light = "light"
     case dark = "dark"
     case system = "system"
-    
-    var text: String {
+
+    var text: LocalizedStringKey {
         switch self {
         case .light: return "Light"
         case .dark: return "Dark"
         case .system: return "System"
+        }
+    }
+}
+
+enum AppLanguage: String, CaseIterable, Codable {
+    case system = "system"
+    case english = "en"
+    case french = "fr"
+    case ukrainian = "uk"
+
+    // Each language's own name, shown in ITS OWN language (standard convention for language
+    // pickers) — deliberately NOT translated, since these labels shouldn't change when the
+    // app's language changes. "System" is the one exception and still resolves through
+    // LocalizedStringKey (not localized(_:) — see SudokuRuleType.displayName's comment).
+    var text: LocalizedStringKey {
+        switch self {
+        case .system: return "System"
+        case .english: return "English"
+        case .french: return "Français"
+        case .ukrainian: return "Українська"
+        }
+    }
+
+    /// nil means "follow the device's system language."
+    var locale: Locale? {
+        switch self {
+        case .system: return nil
+        case .english, .french, .ukrainian: return Locale(identifier: rawValue)
         }
     }
 }

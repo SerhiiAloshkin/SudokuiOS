@@ -60,9 +60,9 @@ struct MainMenuView: View {
                                                 navigationPath = [.customLevels, .customGame(customLevel, session: session)]
                                             }) {
                                                 continueCardContent(
-                                                    title: customLevel.levelName,
+                                                    title: Text(verbatim: customLevel.levelName),
                                                     iconName: customLevel.ruleType.iconName,
-                                                    ruleName: customLevel.ruleType.shortName,
+                                                    ruleName: Text(LocalizedStringKey(customLevel.ruleType.shortName)),
                                                     timeElapsed: session.timeElapsed
                                                 )
                                                 .clipShape(RoundedRectangle(cornerRadius: 18))
@@ -76,9 +76,9 @@ struct MainMenuView: View {
                                             navigationPath = [.levelSelection, .game(session.levelID, session: session)]
                                         }) {
                                             continueCardContent(
-                                                title: "Level \(session.levelID)",
+                                                title: Text("Level \(session.levelID)"),
                                                 iconName: level?.ruleType.iconName ?? "square.grid.3x3",
-                                                ruleName: level?.ruleType.displayName ?? "Sudoku",
+                                                ruleName: Text(LocalizedStringKey(level?.ruleType.displayName ?? "Sudoku")),
                                                 timeElapsed: session.timeElapsed
                                             )
                                             .clipShape(RoundedRectangle(cornerRadius: 18))
@@ -223,7 +223,10 @@ struct MainMenuView: View {
         return String(format: "%02d:%02d", m, s)
     }
     
-    private func continueCardContent(title: String, iconName: String, ruleName: String, timeElapsed: Int) -> some View {
+    // title/ruleName are Text (not String/LocalizedStringKey) so each call site decides how to
+    // resolve them — the campaign case needs a catalog lookup (LocalizedStringKey), the custom
+    // level case is user-generated content that must stay verbatim.
+    private func continueCardContent(title: Text, iconName: String, ruleName: Text, timeElapsed: Int) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("CONTINUE")
@@ -232,15 +235,15 @@ struct MainMenuView: View {
                     .foregroundColor(.white.opacity(0.8))
                     .tracking(1)
                 
-                Text(title)
+                title
                     .font(.title)
                     .fontWeight(.black)
                     .foregroundColor(.white)
-                
+
                 HStack(spacing: 6) {
                     Image(systemName: iconName)
                         .font(.caption)
-                    Text(ruleName)
+                    ruleName
                         .font(.caption)
                     
                     if timeElapsed > 0 {

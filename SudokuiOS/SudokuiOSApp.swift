@@ -42,7 +42,14 @@ struct SudokuiOSApp: App {
             }
             
             _appSettings = State(initialValue: finalSettings)
-            
+
+            // SwiftData loads finalSettings.languageCodeRaw directly (not through the
+            // appLanguage computed property's setter), so LocalizationManager needs an
+            // explicit initial sync here — otherwise a previously-chosen language wouldn't
+            // apply to ViewModel/Model-layer localized(_:) strings until the setting was
+            // changed again.
+            LocalizationManager.shared.currentLocale = finalSettings.appLanguage.locale ?? .autoupdatingCurrent
+
             _levelViewModel = StateObject(wrappedValue: LevelViewModel(modelContext: modelContainer.mainContext))
             
             // iCloud Sync Disabled
@@ -67,6 +74,7 @@ struct SudokuiOSApp: App {
             .animation(.easeInOut(duration: 0.5), value: levelViewModel.appIsReady)
             .environment(appSettings) // Inject AppSettings
             .preferredColorScheme(appSettings?.appTheme.colorScheme) // Adaptive Theme
+            .environment(\.locale, appSettings?.appLanguage.locale ?? .autoupdatingCurrent) // In-app language override
             .modelContainer(container) // Inject for @Query if needed later
         }
         .onChange(of: scenePhase) { _, newPhase in

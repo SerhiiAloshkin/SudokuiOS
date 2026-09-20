@@ -123,7 +123,10 @@ struct LevelSelectionView: View {
                     HStack {
                         Image(systemName: "line.3.horizontal.decrease.circle.fill")
                             .font(.title2)
-                        Text("Filter: \(selectionViewModel.currentFilter.rawValue)")
+                        // currentFilter.text is a plain English catalog key — Text
+                        // concatenation lets the dynamic half resolve via LocalizedStringKey
+                        // while "Filter: " resolves as its own literal.
+                        (Text("Filter: ") + Text(LocalizedStringKey(selectionViewModel.currentFilter.text)))
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)

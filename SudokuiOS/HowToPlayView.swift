@@ -245,11 +245,11 @@ private struct SettingsSection: View {
 // MARK: - Reusable Components
 
 private struct EncyclopediaCard<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     let icon: String
     let content: Content
-    
-    init(title: String, icon: String, @ViewBuilder content: () -> Content) {
+
+    init(title: LocalizedStringKey, icon: String, @ViewBuilder content: () -> Content) {
         self.title = title
         self.icon = icon
         self.content = content()
@@ -282,8 +282,8 @@ private struct EncyclopediaCard<Content: View>: View {
 
 private struct EncyclopediaItem: View {
     let icon: String
-    let title: String
-    let description: String
+    let title: LocalizedStringKey
+    let description: LocalizedStringKey
     
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -308,17 +308,17 @@ private struct EncyclopediaItem: View {
 
 private struct VariantDocItem: View {
     let type: SudokuRuleType
-    let description: String
-    
+    let description: LocalizedStringKey
+
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: type.iconName)
                 .font(.title3)
                 .frame(width: 28)
                 .foregroundColor(.themeBlue)
-            
+
             VStack(alignment: .leading, spacing: 4) {
-                Text(type.displayName)
+                Text(LocalizedStringKey(type.displayName))
                     .font(.subheadline)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)

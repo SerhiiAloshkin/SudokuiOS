@@ -195,7 +195,7 @@ struct StaticRuleCardView: View {
     
     // MARK: - Content Helpers
     
-    var title: String {
+    var title: LocalizedStringKey {
         switch ruleType {
         case .classic: return "NO REPEATS"
         case .nonConsecutive: return "NON-CONSECUTIVE"
@@ -214,7 +214,7 @@ struct StaticRuleCardView: View {
         }
     }
     
-    var description: String {
+    var description: LocalizedStringKey {
         switch ruleType {
         case .classic: return "Numbers cannot repeat in the same row, column, or 3x3 box."
         case .nonConsecutive: return "Adjacent cells cannot contain consecutive numbers (e.g. 4 & 5)."

@@ -5,7 +5,7 @@ struct LevelBuilderView: View {
     @Binding var navigationStack: [MainMenuView.SudokuRoute]
     @StateObject private var viewModel: LevelBuilderViewModel
     @Environment(\.modelContext) private var modelContext
-    
+
     let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 9)
     @State private var showingAlert = false
     
@@ -41,7 +41,7 @@ struct LevelBuilderView: View {
                     footnote: message.footnote,
                     action: {
                         withAnimation {
-                            if message.message == "Level saved successfully!" || message.message == "Updated successfully!" {
+                            if message.shouldNavigateBack {
                                 navigationStack.removeLast()
                             }
                             viewModel.activeMessage = nil
@@ -75,7 +75,13 @@ struct LevelBuilderView: View {
                 .disabled(!viewModel.isSandwichInputValid)
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Enter the sum of digits between 1 and 9 for this \(viewModel.isRowSandwich ? "row" : "column").\nValid values: 0 (adjacent) or 2-35.")
+            // Two full sentences rather than interpolating "row"/"column" into one, so word
+            // order can differ correctly between languages during translation.
+            if viewModel.isRowSandwich {
+                Text("Enter the sum of digits between 1 and 9 for this row.\nValid values: 0 (adjacent) or 2-35.")
+            } else {
+                Text("Enter the sum of digits between 1 and 9 for this column.\nValid values: 0 (adjacent) or 2-35.")
+            }
         }
     }
     
@@ -113,7 +119,7 @@ struct LevelBuilderView: View {
     private func ruleToggleButton(_ rule: LevelBuilderViewModel.GlobalRule) -> some View {
         let isActive = viewModel.isRuleActive(rule)
         Button(action: { viewModel.toggleRule(rule) }) {
-            Text(rule.rawValue)
+            Text(LocalizedStringKey(rule.text))
                 .font(.caption).fontWeight(.semibold)
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(Capsule().fill(isActive ? Color.blue : Color.clear))
@@ -623,7 +629,7 @@ struct LevelBuilderView: View {
 
 struct BuilderToolButton: View {
     let icon: String
-    let label: String
+    let label: LocalizedStringKey
     let isSelected: Bool
     let action: () -> Void
     

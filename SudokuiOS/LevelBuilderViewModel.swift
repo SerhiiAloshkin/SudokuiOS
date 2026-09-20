@@ -43,6 +43,17 @@ class LevelBuilderViewModel: ObservableObject {
         case nonConsecutive = "Non-Consec"
         case king = "King"
         case knight = "Knight"
+
+        // Plain English catalog key, not run through localized(_:) — see
+        // SudokuRuleType.displayName's comment. Display sites wrap this in LocalizedStringKey(...).
+        var text: String {
+            switch self {
+            case .classic: return "Classic"
+            case .nonConsecutive: return "Non-Consec"
+            case .king: return "King"
+            case .knight: return "Knight"
+            }
+        }
     }
     
     func isRuleActive(_ rule: GlobalRule) -> Bool {
@@ -61,7 +72,7 @@ class LevelBuilderViewModel: ObservableObject {
     @Published var isValidating: Bool = false
     @Published var activeMessage: BuilderMessage? = nil
     
-    private let verificationFootnote = "Note: Automated verification can make mistakes or might not cover all logical paths a human can."
+    private let verificationFootnote: LocalizedStringKey = "Note: Automated verification can make mistakes or might not cover all logical paths a human can."
     
     // MARK: - Board Rules Data (Published for UI reactivity)
     @Published var arrows: [SudokuLevel.Arrow] = []
@@ -524,7 +535,7 @@ class LevelBuilderViewModel: ObservableObject {
                 
                 do {
                     try context.save()
-                    self.activeMessage = BuilderMessage(title: "Success", message: "Updated successfully!", footnote: nil)
+                    self.activeMessage = BuilderMessage(title: "Success", message: "Updated successfully!", footnote: nil, shouldNavigateBack: true)
                     return
                 } catch {
                     self.activeMessage = BuilderMessage(title: "Error", message: "Failed to update: \(error.localizedDescription)", footnote: nil)
@@ -532,12 +543,12 @@ class LevelBuilderViewModel: ObservableObject {
                 }
             }
         }
-        
+
         let customLevel = buildCustomLevel(name: name)
         context.insert(customLevel)
         do {
             try context.save()
-            self.activeMessage = BuilderMessage(title: "Success", message: "Level saved successfully!", footnote: nil)
+            self.activeMessage = BuilderMessage(title: "Success", message: "Level saved successfully!", footnote: nil, shouldNavigateBack: true)
         } catch {
             self.activeMessage = BuilderMessage(title: "Error", message: "Failed to save: \(error.localizedDescription)", footnote: nil)
         }

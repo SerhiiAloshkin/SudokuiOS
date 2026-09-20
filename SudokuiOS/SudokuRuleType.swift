@@ -82,6 +82,14 @@ enum SudokuRuleType: String, Codable, CaseIterable {
     }
     
     // Helper to get display name
+    // NOTE: deliberately plain English, NOT run through localized(_:) — String(localized:locale:)
+    // (an explicit, non-environment locale override) does not reliably honor the in-app language
+    // switcher in this project (confirmed: literal Text("...") via .environment(\.locale) DOES
+    // translate correctly, but localized(_:)-sourced String values never did, regardless of any
+    // reactivity fix). This is also used in mixed contexts — both Text(...) display AND string
+    // manipulation (.uppercased(), .replacingOccurrences()) in SudokuGameViewModel.swift — so it
+    // stays a plain String. Display call sites must wrap this in LocalizedStringKey(...) (not
+    // Text(...) directly) so SwiftUI's own environment-locale-driven catalog lookup translates it.
     var displayName: String {
         switch self {
         case .classic: return "Classic Sudoku"
@@ -96,8 +104,10 @@ enum SudokuRuleType: String, Codable, CaseIterable {
         case .king: return "King Sudoku"
         }
     }
-    
-    // Helper for concise labels
+
+    // Helper for concise labels (same plain-English, wrap-at-display-site reasoning as
+    // displayName — SudokuRuleTagView.swift uses .textCase(.uppercase) on the rendered Text
+    // instead of calling .uppercased() on this string, so it stays a translatable catalog key)
     var shortName: String {
         switch self {
         case .classic: return "Classic"
